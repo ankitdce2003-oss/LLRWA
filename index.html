@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>La Lagune RWA — Complaint & Observation Tracker</title>
+<style>
+  :root{
+    --ink:#182226; --paper:#F6F3EC; --paper-raised:#FFFFFF; --line:#DAD3C2;
+    --teal:#0E4F4F; --teal-deep:#0A3A3A; --gold:#B4842B; --brick:#9C3B2E; --sage:#3C6E47; --slate:#5B6670;
+    --font-display:'Space Grotesk','Segoe UI',sans-serif; --font-body:'Inter','Segoe UI',sans-serif; --font-mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);}
+  ::selection{background:var(--gold);color:#fff;}
+
+  /* login */
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,var(--teal-deep),var(--teal));padding:20px;}
+  .login-card{background:var(--paper-raised);border-radius:10px;padding:32px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+  .login-card .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--slate);margin-bottom:6px;}
+  .login-card h1{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .login-card .sub{font-size:12.5px;color:var(--slate);margin-bottom:22px;}
+  .login-card label{display:block;font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;}
+  .login-card input{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px 11px;font-size:14px;margin-bottom:14px;font-family:var(--font-body);}
+  .login-card input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .login-card .err{background:#F4DEDA;color:var(--brick);border:1px solid #E3B7AE;border-radius:6px;padding:8px 10px;font-size:12.5px;margin-bottom:14px;}
+
+  /* ---------- Header / register plate ---------- */
+  .plate{background:linear-gradient(180deg,var(--teal-deep),var(--teal));color:#EFE9DA;padding:22px 28px 20px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;}
+  .plate-title{font-family:var(--font-display);font-weight:600;letter-spacing:0.02em;}
+  .plate-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#C9BFA0;margin-bottom:4px;}
+  .plate-title h1{margin:0;font-size:26px;}
+  .plate-sub{font-size:12.5px;color:#C9BFA0;margin-top:4px;max-width:520px;}
+  .identity-box{background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:10px 14px;min-width:230px;text-align:right;}
+  .identity-box .who{font-size:13px;font-weight:600;}
+  .identity-box .role-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C9BFA0;margin-top:2px;}
+  .identity-box button{margin-top:8px;background:transparent;border:1px solid rgba(255,255,255,0.3);color:#EFE9DA;padding:5px 11px;border-radius:5px;font-size:11.5px;cursor:pointer;}
+  .identity-box button:hover{background:rgba(255,255,255,0.1);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 28px 60px;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:22px;}
+  @media(max-width:900px){.summary-grid{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:560px){.summary-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 12px 10px;position:relative;overflow:hidden;}
+  .stat::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--bar,var(--slate));}
+  .stat .n{font-family:var(--font-display);font-size:24px;font-weight:600;}
+  .stat .l{font-size:10.5px;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+
+  .panel{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;margin-bottom:22px;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;display:flex;align-items:center;gap:8px;}
+  .panel-head h2 .idx{font-family:var(--font-mono);font-size:11px;background:var(--teal);color:#EFE9DA;padding:2px 7px;border-radius:4px;}
+  .panel-body{padding:18px;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:900px){.form-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.form-grid{grid-template-columns:1fr;}}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field.span-4{grid-column:span 4;}
+  @media(max-width:900px){.field.span-4{grid-column:span 2;}}
+  @media(max-width:560px){.field.span-4{grid-column:span 1;}}
+  .field label{font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;}
+  .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13.5px;font-family:var(--font-body);background:#FCFBF8;color:var(--ink);}
+  .field textarea{resize:vertical;min-height:64px;}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+
+  .btn{font-family:var(--font-body);font-weight:600;font-size:13px;border-radius:6px;padding:9px 16px;border:1px solid transparent;cursor:pointer;transition:transform .05s ease;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--teal);color:#F3EFE2;}
+  .btn-primary:hover{background:var(--teal-deep);}
+  .btn-approve{background:var(--sage);color:#fff;}
+  .btn-return{background:var(--brick);color:#fff;}
+  .btn-small{padding:6px 11px;font-size:12px;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .filter-row select,.filter-row input{border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;background:#FCFBF8;}
+
+  .register{width:100%;border-collapse:collapse;font-size:13px;}
+  .register thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap;}
+  .register tbody tr{border-bottom:1px solid var(--line);cursor:pointer;}
+  .register tbody tr:hover{background:#F1ECDE;}
+  .register td{padding:9px 10px;vertical-align:top;}
+  .id-cell{font-family:var(--font-mono);font-size:12px;color:var(--slate);}
+  .desc-cell{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid transparent;}
+  .tag-pending{background:#FBF0D9;color:#8A6314;border-color:#E9CE8F;}
+  .tag-approved{background:#DDEAE2;color:var(--sage);border-color:#B7D4C2;}
+  .tag-returned{background:#F4DEDA;color:var(--brick);border-color:#E3B7AE;}
+  .tag-resolved{background:#DCE7EE;color:#2B5B7A;border-color:#B7D0DE;}
+  .tag-closed{background:#1F3B2A;color:#EAF3EC;border-color:#1F3B2A;}
+  .prio{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;}
+  .prio-Urgent{background:var(--brick);color:#fff;}
+  .prio-High{background:#E7C9A6;color:#7A4315;}
+  .prio-Medium{background:#EFE7CE;color:#7A6314;}
+  .prio-Low{background:#E4E9E2;color:#4B5A4E;}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--slate);}
+  .empty .big{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-bottom:4px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,26,24,0.45);display:flex;justify-content:flex-end;z-index:50;}
+  .drawer{width:min(560px,100%);background:var(--paper);height:100%;overflow-y:auto;border-left:4px solid var(--gold);}
+  .drawer-head{background:var(--teal-deep);color:#EFE9DA;padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  .drawer-head .idm{font-family:var(--font-mono);font-size:11px;color:#C9BFA0;}
+  .drawer-head h3{margin:2px 0 0;font-family:var(--font-display);font-size:18px;}
+  .drawer-close{background:none;border:none;color:#EFE9DA;font-size:20px;cursor:pointer;line-height:1;}
+  .drawer-body{padding:18px 20px;}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:13px;margin-bottom:14px;}
+  .kv .k{color:var(--slate);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;padding-top:1px;}
+  .desc-block{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;margin-bottom:16px;white-space:pre-wrap;}
+
+  .stamp-panel{border:1px dashed var(--line);border-radius:8px;padding:14px;margin-bottom:16px;background:#FCFBF8;}
+  .stamp-panel h4{margin:0 0 8px;font-family:var(--font-display);font-size:13px;}
+  .stamp-panel .hint{font-size:12px;color:var(--slate);margin-bottom:10px;}
+  .remark-input{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;min-height:56px;margin-bottom:10px;font-family:var(--font-body);}
+
+  .trail{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);margin-left:6px;}
+  .trail li{position:relative;padding:0 0 16px 18px;}
+  .trail li::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--dot,var(--slate));border:2px solid var(--paper);}
+  .trail .t-head{font-size:12.5px;font-weight:700;}
+  .trail .t-meta{font-size:11px;color:var(--slate);margin:1px 0 3px;}
+  .trail .t-remark{font-size:12.5px;background:var(--paper-raised);border:1px solid var(--line);border-radius:6px;padding:7px 9px;}
+
+  .loading-note{padding:40px;text-align:center;color:var(--slate);font-size:13px;}
+  .banner{background:#FBF0D9;border:1px solid #E9CE8F;color:#7A5A10;border-radius:8px;padding:9px 13px;font-size:12.5px;margin-bottom:16px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  const app = document.getElementById('app');
+  let session = null;
+  let complaints = [];
+  let categories = [];
+  let priorities = [];
+  let filters = { status:'all', category:'all', priority:'all', search:'' };
+  let activeDetailId = null;
+
+  async function api(path, opts){
+    const res = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
+    let data = {};
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  }
+
+  function toast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 3200);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }
+  function daysSince(iso){ return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); }
+  function statusTagClass(s){
+    return { 'Pending Review':'tag-pending','Approved':'tag-approved','Returned':'tag-returned','Resolved':'tag-resolved','Verified & Closed':'tag-closed' }[s] || 'tag-pending';
+  }
+  function dotColor(action){
+    if(/logged|resubmitted/i.test(action)) return '#B4842B';
+    if(/approved|verified/i.test(action)) return '#3C6E47';
+    if(/returned/i.test(action)) return '#9C3B2E';
+    if(/resolved/i.test(action)) return '#2B5B7A';
+    return '#5B6670';
+  }
+
+  // ---------------- LOGIN ----------------
+  const CHECKER_TYPES = ['Resident', 'RWA Committee Member', 'Estate Office Staff'];
+
+  function renderLogin(errorMsg){
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="eyebrow">Estate Office &middot; Digital Register</div>
+          <h1>La Lagune RWA Tracker</h1>
+          <div class="sub">Choose your role and enter the shared access code for it. Everyone logging or reviewing entries types their own name below, so the audit trail shows who actually did what.</div>
+          ${errorMsg ? `<div class="err">${escapeHtml(errorMsg)}</div>` : ''}
+          <form id="loginForm">
+            <label for="role">I am</label>
+            <select id="role">
+              <option value="staff">Estate Office Staff (logs entries)</option>
+              <option value="checker">Resident / RWA Checker (reviews entries)</option>
+            </select>
+
+            <div id="checkerTypeField" style="display:none;">
+              <label for="checkerType">Acting as</label>
+              <select id="checkerType">
+                ${CHECKER_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}
+              </select>
+            </div>
+
+            <label for="name">Your name</label>
+            <input id="name" type="text" placeholder="e.g. Ramesh, or Mrs. Sharma (B-402)" autocomplete="name" required />
+
+            <label for="code">Access code</label>
+            <input id="code" type="password" placeholder="Shared code for this role" autocomplete="current-password" required />
+
+            <button class="btn btn-primary" style="width:100%;" type="submit">Sign in</button>
+          </form>
+        </div>
+      </div>
+    `;
+    const roleSelect = document.getElementById('role');
+    const checkerTypeField = document.getElementById('checkerTypeField');
+    function syncCheckerField(){
+      checkerTypeField.style.display = roleSelect.value === 'checker' ? 'block' : 'none';
+    }
+    roleSelect.addEventListener('change', syncCheckerField);
+    syncCheckerField();
+
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const role = roleSelect.value;
+      const name = document.getElementById('name').value.trim();
+      const code = document.getElementById('code').value;
+      const checkerType = role === 'checker' ? document.getElementById('checkerType').value : undefined;
+      try{
+        const data = await api('/api/login', { method:'POST', body: JSON.stringify({ role, name, code, checkerType }) });
+        session = data.user;
+        await boot();
+      }catch(err){
+        renderLogin(err.message);
+      }
+    });
+  }
+
+  // ---------------- APP SHELL ----------------
+  async function loadComplaints(){
+    const data = await api('/api/complaints');
+    complaints = data.complaints;
+    categories = data.categories;
+    priorities = data.priorities;
+  }
+
+  function filteredComplaints(){
+    return complaints.filter(c=>{
+      if(filters.status !== 'all' && c.status !== filters.status) return false;
+      if(filters.category !== 'all' && c.category !== filters.category) return false;
+      if(filters.priority !== 'all' && c.priority !== filters.priority) return false;
+      if(filters.search){
+        const s = filters.search.toLowerCase();
+        if(!(c.id.toLowerCase().includes(s) || (c.tower||'').toLowerCase().includes(s) || c.unit.toLowerCase().includes(s) || c.description.toLowerCase().includes(s) || (c.residentName||'').toLowerCase().includes(s))) return false;
+      }
+      return true;
+    });
+  }
+
+  function summaryCounts(){
+    const s = {total:complaints.length, pending:0, approved:0, returned:0, resolved:0, closed:0, overdue:0};
+    complaints.forEach(c=>{
+      if(c.status==='Pending Review'){ s.pending++; if(daysSince(c.createdAt)>2) s.overdue++; }
+      if(c.status==='Approved') s.approved++;
+      if(c.status==='Returned') s.returned++;
+      if(c.status==='Resolved') s.resolved++;
+      if(c.status==='Verified & Closed') s.closed++;
+    });
+    return s;
+  }
+
+  function renderApp(){
+    const s = summaryCounts();
+    const list = filteredComplaints();
+    const isStaff = session.role === 'staff';
+
+    app.innerHTML = `
+      <div class="plate">
+        <div>
+          <div class="plate-eyebrow">Estate Office &middot; Digital Register</div>
+          <div class="plate-title"><h1>La Lagune RWA — Complaint &amp; Observation Tracker</h1></div>
+          <div class="plate-sub">Every entry is logged by estate office staff and must be reviewed and signed off by a resident or RWA committee member before it is closed.</div>
+        </div>
+        <div class="identity-box">
+          <div class="who">${escapeHtml(session.displayName)}</div>
+          <div class="role-tag">${isStaff ? 'Estate Office · Maker' : escapeHtml(session.checkerType || 'Checker') + ' · Checker'}</div>
+          <button id="logoutBtn">Sign out</button>
+        </div>
+      </div>
+      <div class="wrap" id="wrap"></div>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+      await api('/api/logout', { method:'POST' });
+      session = null; complaints = []; activeDetailId = null;
+      renderLogin();
+    });
+
+    const wrap = document.getElementById('wrap');
+    wrap.innerHTML = `
+      <div class="summary-grid">
+        <div class="stat" style="--bar:var(--slate)"><div class="n">${s.total}</div><div class="l">Total logged</div></div>
+        <div class="stat" style="--bar:#B4842B"><div class="n">${s.pending}</div><div class="l">Pending review</div></div>
+        <div class="stat" style="--bar:#3C6E47"><div class="n">${s.approved}</div><div class="l">Approved / in progress</div></div>
+        <div class="stat" style="--bar:#9C3B2E"><div class="n">${s.returned}</div><div class="l">Returned</div></div>
+        <div class="stat" style="--bar:#2B5B7A"><div class="n">${s.resolved}</div><div class="l">Awaiting verification</div></div>
+        <div class="stat" style="--bar:#9C3B2E"><div class="n">${s.overdue}</div><div class="l">Pending &gt;2 days</div></div>
+      </div>
+
+      ${isStaff ? `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">Maker</span> Log a new observation / complaint</h2></div>
+        <div class="panel-body">
+          <div class="banner">Entries you log here go to <strong>Pending Review</strong> and must be approved by a resident or RWA committee member — they are not final until signed off.</div>
+          <div class="form-grid">
+            <div class="field"><label for="f-tower">Tower</label><input id="f-tower" type="text" placeholder="e.g. B" /></div>
+            <div class="field"><label for="f-unit">Unit / Flat No.</label><input id="f-unit" type="text" placeholder="e.g. 402" /></div>
+            <div class="field"><label for="f-resident">Resident name (optional)</label><input id="f-resident" type="text" placeholder="e.g. Mrs. Sharma" /></div>
+            <div class="field"><label for="f-category">Category</label><select id="f-category">${categories.map(c=>`<option>${c}</option>`).join('')}</select></div>
+            <div class="field"><label for="f-priority">Priority</label><select id="f-priority">${priorities.map(p=>`<option>${p}</option>`).join('')}</select></div>
+            <div class="field span-4"><label for="f-desc">Observation / complaint details</label><textarea id="f-desc" placeholder="Describe what was observed or reported, where, and when…"></textarea></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" id="submitBtn">Submit for review</button></div>
+        </div>
+      </div>` : `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">Checker</span> Your review queue</h2></div>
+        <div class="panel-body"><div class="banner">As a resident/RWA member, you approve or return entries logged by the estate office, and give final sign-off once staff mark an issue resolved.</div></div>
+      </div>`}
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Register</h2>
+          <div class="filter-row">
+            <input id="searchInput" type="text" placeholder="Search unit, ID, description…" value="${escapeHtml(filters.search)}" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option>Pending Review</option><option>Approved</option><option>Returned</option><option>Resolved</option><option>Verified &amp; Closed</option>
+            </select>
+            <select id="categoryFilter"><option value="all">All categories</option>${categories.map(c=>`<option>${c}</option>`).join('')}</select>
+            <select id="priorityFilter"><option value="all">All priorities</option>${priorities.map(p=>`<option>${p}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          ${list.length ? `
+          <div style="overflow-x:auto;">
+          <table class="register">
+            <thead><tr><th>ID</th><th>Logged</th><th>Tower</th><th>Unit</th><th>Category</th><th>Priority</th><th>Description</th><th>Status</th><th>Checker</th></tr></thead>
+            <tbody>
+              ${list.map(c=>`
+                <tr data-id="${c.id}">
+                  <td class="id-cell">${c.id}</td>
+                  <td>${fmtDate(c.createdAt)}</td>
+                  <td>${escapeHtml(c.tower)}</td>
+                  <td>${escapeHtml(c.unit)}</td>
+                  <td>${escapeHtml(c.category)}</td>
+                  <td><span class="prio prio-${c.priority}">${c.priority}</span></td>
+                  <td class="desc-cell">${escapeHtml(c.description)}</td>
+                  <td><span class="tag ${statusTagClass(c.status)}">${c.status}</span></td>
+                  <td>${escapeHtml(c.checker) || '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          </div>` : `<div class="empty"><div class="big">No entries match these filters</div>Adjust filters above, or log a new entry.</div>`}
+        </div>
+      </div>
+    `;
+
+    if(isStaff){
+      document.getElementById('submitBtn').addEventListener('click', async ()=>{
+        const tower = document.getElementById('f-tower').value.trim();
+        const unit = document.getElementById('f-unit').value.trim();
+        const description = document.getElementById('f-desc').value.trim();
+        if(!tower || !unit || !description){ toast('Please enter at least the tower, unit number and description.'); return; }
+        try{
+          await api('/api/complaints', { method:'POST', body: JSON.stringify({
+            tower, unit, residentName: document.getElementById('f-resident').value.trim(),
+            category: document.getElementById('f-category').value,
+            priority: document.getElementById('f-priority').value,
+            description
+          })});
+          toast('Entry submitted for review.');
+          await refresh();
+        }catch(err){ toast(err.message); }
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e)=>{ filters.search = e.target.value; renderApp(); });
+    document.getElementById('statusFilter').value = filters.status;
+    document.getElementById('statusFilter').addEventListener('change', (e)=>{ filters.status = e.target.value; renderApp(); });
+    document.getElementById('categoryFilter').value = filters.category;
+    document.getElementById('categoryFilter').addEventListener('change', (e)=>{ filters.category = e.target.value; renderApp(); });
+    document.getElementById('priorityFilter').value = filters.priority;
+    document.getElementById('priorityFilter').addEventListener('change', (e)=>{ filters.priority = e.target.value; renderApp(); });
+
+    wrap.querySelectorAll('tbody tr').forEach(tr=>{
+      tr.addEventListener('click', ()=> openDetail(tr.getAttribute('data-id')));
+    });
+
+    if(activeDetailId) renderDetail(activeDetailId);
+  }
+
+  async function refresh(){
+    await loadComplaints();
+    renderApp();
+  }
+
+  function openDetail(id){ activeDetailId = id; renderDetail(id); }
+  function closeDetail(){ activeDetailId = null; const ov = document.getElementById('detailOverlay'); if(ov) ov.remove(); }
+
+  function renderDetail(id){
+    const existing = document.getElementById('detailOverlay');
+    if(existing) existing.remove();
+    const c = complaints.find(x=>x.id===id);
+    if(!c) return;
+    const isStaff = session.role === 'staff';
+
+    let actionPanel = '';
+    if(!isStaff && c.status==='Pending Review'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Review this entry</h4>
+          <div class="hint">Approve to move this into progress, or return it to the estate office with a note if it needs correction.</div>
+          <textarea class="remark-input" id="checkerRemark" placeholder="Remarks (optional for approval, recommended for return)…"></textarea>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-approve btn-small" id="approveBtn">Approve</button>
+            <button class="btn btn-return btn-small" id="returnBtn">Return for correction</button>
+          </div>
+        </div>`;
+    } else if(isStaff && c.status==='Returned'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Resubmit corrected entry</h4>
+          <div class="hint">Address the checker's remarks above, then resubmit for review.</div>
+          <textarea class="remark-input" id="resubmitRemark" placeholder="What was corrected/updated…"></textarea>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-primary btn-small" id="resubmitBtn">Resubmit for review</button>
+          </div>
+        </div>`;
+    } else if(isStaff && c.status==='Approved'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Mark as resolved</h4>
+          <div class="hint">Once the issue is actually fixed on the ground, mark it resolved. It will still need the checker's final verification to close.</div>
+          <textarea class="remark-input" id="resolveRemark" placeholder="How was this resolved…"></textarea>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-primary btn-small" id="resolveBtn">Mark resolved</button>
+          </div>
+        </div>`;
+    } else if(!isStaff && c.status==='Resolved'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Verify and close</h4>
+          <div class="hint">Confirm the resolution is satisfactory before closing this entry permanently.</div>
+          <textarea class="remark-input" id="verifyRemark" placeholder="Verification remarks (optional)…"></textarea>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-approve btn-small" id="verifyBtn">Verify &amp; close</button>
+            <button class="btn btn-return btn-small" id="reopenBtn">Not satisfactory — return</button>
+          </div>
+        </div>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.id = 'detailOverlay';
+    overlay.innerHTML = `
+      <div class="drawer">
+        <div class="drawer-head">
+          <div><div class="idm">${c.id}</div><h3>${escapeHtml(c.tower)}-${escapeHtml(c.unit)} · ${escapeHtml(c.category)}</h3></div>
+          <button class="drawer-close" id="closeDrawer" aria-label="Close">&times;</button>
+        </div>
+        <div class="drawer-body">
+          <div class="kv">
+            <div class="k">Status</div><div><span class="tag ${statusTagClass(c.status)}">${c.status}</span></div>
+            <div class="k">Tower</div><div>${escapeHtml(c.tower)}</div>
+            <div class="k">Unit</div><div>${escapeHtml(c.unit)}</div>
+            <div class="k">Priority</div><div><span class="prio prio-${c.priority}">${c.priority}</span></div>
+            <div class="k">Logged by</div><div>${escapeHtml(c.loggedBy)}</div>
+            <div class="k">Logged on</div><div>${fmtDate(c.createdAt)}</div>
+            <div class="k">Resident</div><div>${escapeHtml(c.residentName) || '—'}</div>
+            <div class="k">Checker</div><div>${escapeHtml(c.checker) || 'Not yet reviewed'}</div>
+          </div>
+          <div class="desc-block">${escapeHtml(c.description)}</div>
+          ${c.resolutionNotes ? `<div class="kv"><div class="k">Resolution</div><div>${escapeHtml(c.resolutionNotes)}</div></div>` : ''}
+          ${actionPanel}
+          <h4 style="font-family:var(--font-display);font-size:13px;margin:18px 0 10px;">Audit trail</h4>
+          <ul class="trail">
+            ${c.audit.slice().reverse().map(a=>`
+              <li style="--dot:${dotColor(a.action)}">
+                <div class="t-head">${escapeHtml(a.action)}</div>
+                <div class="t-meta">${escapeHtml(a.actor)} (${a.role==='staff'?'Estate Office':escapeHtml(a.checkerType || 'Resident/RWA')}) · ${fmtDate(a.timestamp)}</div>
+                ${a.remark ? `<div class="t-remark">${escapeHtml(a.remark)}</div>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeDetail(); });
+    document.getElementById('closeDrawer').addEventListener('click', closeDetail);
+
+    async function act(url, remark, requireRemark){
+      if(requireRemark && !remark){ toast('A remark is required for this action.'); return; }
+      try{
+        await api(url, { method:'POST', body: JSON.stringify({ remark }) });
+        await refresh();
+        openDetail(c.id);
+      }catch(err){ toast(err.message); }
+    }
+    const approveBtn = document.getElementById('approveBtn');
+    if(approveBtn) approveBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/approve`, document.getElementById('checkerRemark').value.trim(), false));
+    const returnBtn = document.getElementById('returnBtn');
+    if(returnBtn) returnBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/return`, document.getElementById('checkerRemark').value.trim(), true));
+    const resubmitBtn = document.getElementById('resubmitBtn');
+    if(resubmitBtn) resubmitBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/resubmit`, document.getElementById('resubmitRemark').value.trim(), false));
+    const resolveBtn = document.getElementById('resolveBtn');
+    if(resolveBtn) resolveBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/resolve`, document.getElementById('resolveRemark').value.trim(), true));
+    const verifyBtn = document.getElementById('verifyBtn');
+    if(verifyBtn) verifyBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/verify`, document.getElementById('verifyRemark').value.trim(), false));
+    const reopenBtn = document.getElementById('reopenBtn');
+    if(reopenBtn) reopenBtn.addEventListener('click', ()=> act(`/api/complaints/${c.id}/return`, document.getElementById('verifyRemark').value.trim(), true));
+  }
+
+  async function boot(){
+    app.innerHTML = '<div class="loading-note">Loading register…</div>';
+    try{
+      if(!session){
+        const s = await api('/api/session');
+        session = s.user;
+      }
+      if(!session){ renderLogin(); return; }
+      await loadComplaints();
+      renderApp();
+    }catch(err){
+      renderLogin(err.message);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

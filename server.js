@@ -26,7 +26,21 @@ const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'insecure-dev-secret-change-me';
 const COOKIE_NAME = 'll_session';
 
 app.set('trust proxy', 1);
-app.use(helmet());
+// The frontend is a single HTML file with an inline <script> and <style>
+// block (no build step / bundler), so the default CSP — which blocks
+// inline scripts and styles — has to be relaxed for those two directives.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
