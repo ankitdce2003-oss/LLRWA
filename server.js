@@ -1,12 +1,16 @@
+require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const db = require('./db');
+
+// Creates the complaints table/sequence if they don't exist yet. Safe to run
+// every cold start — CREATE TABLE IF NOT EXISTS is a no-op once it exists.
+db.initSchema().catch((err) => console.error('Failed to initialize database schema', err));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,8 +52,8 @@ function readUserFromCookie(req) {
   const token = req.cookies[COOKIE_NAME];
   if (!token) return null;
   try {
-    const { username, role, displayName } = jwt.verify(token, EFFECTIVE_JWT_SECRET);
-    return { username, role, displayName };
+    const { role, displayName, checkerType } = jwt.verify(token, EFFECTIVE_JWT_SECRET);
+    return { role, displayName, checkerType: checkerType || null };
   } catch {
     return null;
   }
@@ -71,18 +75,44 @@ function requireRole(role) {
 }
 
 // ---------- auth routes ----------
+// No individual accounts. Two shared access codes gate the two roles;
+// each person types their own name (and, for checkers, who they're acting
+// as) every time they sign in — that name/role is what lands in the audit
+// trail on every action they take.
+const CHECKER_TYPES = ['Resident', 'RWA Committee Member', 'Estate Office Staff'];
+
 app.post('/api/login', loginLimiter, async (req, res) => {
-  const { username, password } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required.' });
+  const { role, code, name, checkerType } = req.body || {};
+  if (!role || !code || !name) {
+    return res.status(400).json({ error: 'Role, access code, and your name are all required.' });
   }
-  const user = await db.findUser(username);
-  if (!user) return res.status(401).json({ error: 'Invalid username or password.' });
+  if (role !== 'staff' && role !== 'checker') {
+    return res.status(400).json({ error: 'Invalid role.' });
+  }
 
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Invalid username or password.' });
+  const STAFF_CODE = process.env.STAFF_ACCESS_CODE;
+  const CHECKER_CODE = process.env.CHECKER_ACCESS_CODE;
+  const expected = role === 'staff' ? STAFF_CODE : CHECKER_CODE;
+  if (!expected) {
+    return res.status(503).json({ error: `${role === 'staff' ? 'STAFF_ACCESS_CODE' : 'CHECKER_ACCESS_CODE'} is not set up yet. Add it in Vercel's Environment Variables.` });
+  }
+  if (code !== expected) {
+    return res.status(401).json({ error: 'Incorrect access code.' });
+  }
 
-  const sessionUser = { username: user.username, role: user.role, displayName: user.displayName };
+  let resolvedCheckerType = null;
+  if (role === 'checker') {
+    if (!CHECKER_TYPES.includes(checkerType)) {
+      return res.status(400).json({ error: 'Please choose who you are acting as.' });
+    }
+    resolvedCheckerType = checkerType;
+  }
+
+  const sessionUser = {
+    role,
+    displayName: name.trim(),
+    checkerType: resolvedCheckerType,
+  };
   setSessionCookie(res, sessionUser);
   res.json({ user: sessionUser });
 });
@@ -104,7 +134,14 @@ const CATEGORIES = [
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 
 function makeAudit(action, user, remark) {
-  return { action, actor: user.displayName, role: user.role, remark: remark || '', timestamp: new Date().toISOString() };
+  return {
+    action,
+    actor: user.displayName,
+    role: user.role,
+    checkerType: user.checkerType || null,
+    remark: remark || '',
+    timestamp: new Date().toISOString(),
+  };
 }
 
 // ---------- complaint routes ----------

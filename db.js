@@ -27,14 +27,6 @@ const pool = new Pool({
 
 async function initSchema() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      username TEXT PRIMARY KEY,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('staff','checker')),
-      display_name TEXT NOT NULL
-    );
-  `);
-  await pool.query(`
     CREATE SEQUENCE IF NOT EXISTS complaint_seq START 1;
   `);
   await pool.query(`
@@ -77,29 +69,6 @@ function rowToComplaint(row) {
 module.exports = {
   initSchema,
   pool,
-
-  // ---------- users ----------
-  async findUser(username) {
-    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (!rows[0]) return null;
-    return {
-      username: rows[0].username,
-      passwordHash: rows[0].password_hash,
-      role: rows[0].role,
-      displayName: rows[0].display_name,
-    };
-  },
-  async upsertUser({ username, passwordHash, role, displayName }) {
-    await pool.query(
-      `INSERT INTO users (username, password_hash, role, display_name)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (username) DO UPDATE
-         SET password_hash = EXCLUDED.password_hash,
-             role = EXCLUDED.role,
-             display_name = EXCLUDED.display_name`,
-      [username, passwordHash, role, displayName]
-    );
-  },
 
   // ---------- complaints ----------
   async getComplaints() {

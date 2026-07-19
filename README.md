@@ -1,14 +1,25 @@
 # La Lagune RWA — Complaint & Observation Tracker (Vercel edition)
 
-A self-hosted complaint/observation register for the estate office, with a
-maker-checker approval workflow: estate office staff log entries, and a
-resident or RWA committee member must approve, return, or close them. Every
-action is recorded in an audit trail.
+A complaint/observation register for the estate office, with a maker-checker
+approval workflow: estate office staff log entries, and a resident or RWA
+committee member must approve, return, or close them. Every action is
+recorded in an audit trail.
 
-This version is built to deploy on **Vercel**, using a Postgres database for
-storage (Vercel's serverless functions don't have a persistent filesystem,
-so a database replaces the JSON files used in the VPS/Render version of this
-app).
+## How sign-in works
+
+There are no individual accounts. Instead there are **two shared access
+codes** — one for the Staff (maker) role, one for the Checker role. Anyone
+who has the relevant code can sign in as that role, typing their own name
+each time. Checkers also pick who they're acting as when they sign in:
+**Resident**, **RWA Committee Member**, or **Estate Office Staff** (for a
+staff member covering a checker's review). Whatever they type/pick is what
+shows up in the audit trail on every action they take — so you still get a
+real record of who did what, without managing a login for every person.
+
+Treat both codes like shared passwords: give the Staff code to your estate
+office team, and the Checker code to your RWA committee and any residents
+you want reviewing entries. Change them (just update the environment
+variables and redeploy) if you ever need to revoke access broadly.
 
 ## How the workflow works
 
@@ -18,100 +29,61 @@ app).
 At any review point the checker can **Return** an entry with a remark; staff
 then correct it and resubmit, which puts it back in `Pending Review`.
 
-Two account roles:
-- **staff** — logs new entries, resubmits returned entries, marks approved
-  entries resolved.
-- **checker** — approves/returns pending entries, verifies/reopens resolved
-  entries. Intended for RWA committee members or designated residents.
+## Deploying on Vercel
 
-Login is stateless (a signed JWT in an httpOnly cookie) rather than
-server-side sessions, since serverless functions don't share memory between
-invocations the way a normal server does.
+1. **Push this folder to a GitHub repository**, then in Vercel: **Add New →
+   Project → Import** that repository. Leave build settings as default —
+   `vercel.json` routes everything through `api/index.js`.
 
-## Deploying to your Vercel project
+2. **Add a Postgres database.** In the project's Storage tab → Create
+   Database → **Neon** (Serverless Postgres). When connecting it to the
+   project, clear the "Custom Environment Variable Prefix" field so the
+   variable is created as plain `POSTGRES_URL` rather than a prefixed name
+   — the app looks for `POSTGRES_URL` or `DATABASE_URL` specifically.
 
-You already have a Vercel project (e.g. `llrwav23062026`) with **Connect Git
-Repository** waiting — here's the rest of the setup:
+3. **Add three environment variables** in Settings → Environment Variables:
+   - `JWT_SECRET` — any long random string (e.g. generate with
+     `openssl rand -hex 32`)
+   - `STAFF_ACCESS_CODE` — the code you'll give your estate office team
+   - `CHECKER_ACCESS_CODE` — the code you'll give residents/committee members
 
-1. **Push this folder to a GitHub repository.** Vercel deploys by watching a
-   Git repo, so create a repo (on GitHub, GitLab, or Bitbucket) and push
-   everything in this folder to it.
+4. **Redeploy** (Deployments tab → ⋮ on the latest deployment → Redeploy)
+   so the new environment variables and database connection take effect.
 
-2. **Connect the repo.** In your Vercel project, click **Connect Git
-   Repository** and pick the repo you just pushed. Vercel will detect it as
-   a Node project automatically — you don't need to change the build
-   settings; `vercel.json` in this folder tells Vercel to route everything
-   through `api/index.js`.
+5. **Visit your `.vercel.app` URL**, sign in with either code, and you're
+   in. Share the Staff code and Checker code with the relevant people
+   directly (in person, a shared note, however you'd share any password) —
+   there's no invite/email flow, just the code.
 
-3. **Add a Postgres database.** In the left sidebar, click **Storage** →
-   **Create Database** → choose the Postgres option (Vercel offers this via
-   a Neon-backed integration with a free tier). Once created, click
-   **Connect Project** and select this project — Vercel will automatically
-   add a `POSTGRES_URL` environment variable for you. You don't need to
-   copy/paste a connection string yourself.
-
-4. **Set the other environment variable.** In **Settings → Environment
-   Variables**, add:
-   - `JWT_SECRET` — a random value, e.g. generate one locally with
-     `openssl rand -hex 32` and paste it in.
-
-   (`NODE_ENV=production` is set automatically by Vercel — you don't need
-   to add it.)
-
-5. **Deploy.** Vercel deploys automatically once the repo is connected and
-   env vars are set. Watch the Deployments tab for the build to finish.
-
-6. **Initialize the database and create accounts.** This needs to be run
-   from your own computer, pointed at the same database Vercel is using:
-   - In the Vercel Storage tab, open your Postgres database and copy its
-     connection string (usually shown as `POSTGRES_URL` or similar).
-   - On your machine, inside this project folder:
-     ```bash
-     npm install
-     echo 'POSTGRES_URL=paste-the-connection-string-here' > .env
-     npm run init-db
-     npm run add-user -- --username estateoffice --password "changeme" --role staff --name "Estate Office"
-     npm run add-user -- --username president --password "changeme" --role checker --name "President, RWA Committee"
-     ```
-   - Run `add-user` again any time to add more accounts (one per staff
-     member / committee member is recommended) or reset a password.
-   - **Delete the `.env` file afterwards** or make sure it's not committed —
-     it contains a real database credential. `.gitignore` already excludes
-     it, just don't force-add it.
-
-7. **Visit your `.vercel.app` URL** (shown on your project's Overview page,
-   e.g. `llrwav23062026.vercel.app`) and sign in with an account you just
-   created. Once you're happy with it, add a custom domain from the
-   **Domains** tab in the sidebar.
+The database table is created automatically the first time the app runs —
+no manual setup step needed.
 
 ## Local development
 
 ```bash
 npm install
 cp .env.example .env
-# fill in JWT_SECRET and POSTGRES_URL (point at a local Postgres or a dev
-# branch of your Vercel/Neon database)
-npm run init-db
-npm run add-user -- --username you --password "test1234" --role staff --name "Your Name"
+# fill in JWT_SECRET, STAFF_ACCESS_CODE, CHECKER_ACCESS_CODE, and POSTGRES_URL
 npm start
 ```
 Then open http://localhost:3000.
 
 ## Notes on this architecture
 
-- **No file storage.** Everything lives in Postgres (`db.js`), including
-  the audit trail (stored as JSONB per complaint). There's nothing on disk
-  to back up manually — back up the database instead, via Vercel/Neon's own
-  backup or export tools.
+- **No file storage.** Complaints (including the full audit trail, stored
+  as JSONB) live in Postgres. Back up the database via Neon/Vercel's own
+  tools — there's nothing on disk to back up manually.
 - **Concurrency-safe updates.** Approve/return/resolve/verify actions use a
-  row lock (`SELECT ... FOR UPDATE`) inside a transaction, so two people
-  acting on the same entry at once can't corrupt its state.
+  row lock inside a transaction, so two people acting on the same entry at
+  once can't corrupt its state.
+- **Access codes over accounts.** This trades per-person authentication for
+  simplicity — anyone with a code can act in that role under any name they
+  type. That's an intentional fit for a small, trusted community; it means
+  the audit trail records what people *say* their name is, not a verified
+  identity. If you later want real verified accounts instead, that's a
+  bigger change (back to a users table + passwords) — say the word and it
+  can be rebuilt that way.
 - **Rate limiting is best-effort.** `express-rate-limit`'s in-memory counter
   resets whenever a serverless instance cold-starts, so it slows down
-  casual brute-forcing but isn't a hard guarantee the way it would be on a
-  single long-running server. For a small internal tool this is an
-  acceptable trade-off.
-- **No self-serve signup.** Accounts only come from `npm run add-user`
-  (run against your production database from your own machine), so access
-  stays limited to people the estate office has actually issued
-  credentials to.
+  casual code-guessing but isn't a hard guarantee on Vercel's serverless
+  model.
