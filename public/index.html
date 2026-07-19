@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>La Lagune RWA — Painting Project Tracker</title>
+<style>
+  :root{
+    --ink:#182226; --paper:#F6F3EC; --paper-raised:#FFFFFF; --line:#DAD3C2;
+    --teal:#0E4F4F; --teal-deep:#0A3A3A; --gold:#B4842B; --brick:#9C3B2E; --sage:#3C6E47; --slate:#5B6670;
+    --font-display:'Space Grotesk','Segoe UI',sans-serif; --font-body:'Inter','Segoe UI',sans-serif; --font-mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);}
+  ::selection{background:var(--gold);color:#fff;}
+
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,var(--teal-deep),var(--teal));padding:20px;}
+  .login-card{background:var(--paper-raised);border-radius:10px;padding:32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+  .login-card .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--slate);margin-bottom:6px;}
+  .login-card h1{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .login-card .sub{font-size:12.5px;color:var(--slate);margin-bottom:22px;line-height:1.5;}
+  .login-card label{display:block;font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;margin-top:14px;}
+  .login-card label:first-of-type{margin-top:0;}
+  .login-card input,.login-card select{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px 11px;font-size:14px;margin-bottom:0;font-family:var(--font-body);}
+  .login-card input:focus,.login-card select:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .login-card .err{background:#F4DEDA;color:var(--brick);border:1px solid #E3B7AE;border-radius:6px;padding:8px 10px;font-size:12.5px;margin-bottom:14px;}
+
+  .plate{background:linear-gradient(180deg,var(--teal-deep),var(--teal));color:#EFE9DA;padding:22px 28px 20px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;}
+  .plate-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#C9BFA0;margin-bottom:4px;}
+  .plate-title h1{margin:0;font-size:24px;font-family:var(--font-display);font-weight:600;letter-spacing:0.02em;}
+  .plate-sub{font-size:12.5px;color:#C9BFA0;margin-top:4px;max-width:560px;}
+  .identity-box{background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:10px 14px;min-width:230px;text-align:right;}
+  .identity-box .who{font-size:13px;font-weight:600;}
+  .identity-box .role-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#C9BFA0;margin-top:2px;}
+  .identity-box button{margin-top:8px;background:transparent;border:1px solid rgba(255,255,255,0.3);color:#EFE9DA;padding:5px 11px;border-radius:5px;font-size:11.5px;cursor:pointer;}
+  .identity-box button:hover{background:rgba(255,255,255,0.1);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 28px 60px;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px;}
+  @media(max-width:900px){.summary-grid{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:560px){.summary-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 12px 10px;position:relative;overflow:hidden;}
+  .stat::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--bar,var(--slate));}
+  .stat .n{font-family:var(--font-display);font-size:24px;font-weight:600;}
+  .stat .l{font-size:10.5px;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+
+  .panel{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;margin-bottom:22px;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;display:flex;align-items:center;gap:8px;}
+  .panel-head h2 .idx{font-family:var(--font-mono);font-size:11px;background:var(--teal);color:#EFE9DA;padding:2px 7px;border-radius:4px;}
+  .panel-body{padding:18px;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:900px){.form-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.form-grid{grid-template-columns:1fr;}}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field.span-2{grid-column:span 2;}
+  .field.span-4{grid-column:span 4;}
+  @media(max-width:900px){.field.span-4{grid-column:span 2;}}
+  @media(max-width:560px){.field.span-2,.field.span-4{grid-column:span 1;}}
+  .field label{font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;}
+  .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13.5px;font-family:var(--font-body);background:#FCFBF8;color:var(--ink);}
+  .field textarea{resize:vertical;min-height:64px;}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+
+  .btn{font-family:var(--font-body);font-weight:600;font-size:13px;border-radius:6px;padding:9px 16px;border:1px solid transparent;cursor:pointer;transition:transform .05s ease;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--teal);color:#F3EFE2;}
+  .btn-primary:hover{background:var(--teal-deep);}
+  .btn-approve{background:var(--sage);color:#fff;}
+  .btn-return{background:var(--brick);color:#fff;}
+  .btn-small{padding:6px 11px;font-size:12px;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .filter-row select,.filter-row input{border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;background:#FCFBF8;}
+
+  .register{width:100%;border-collapse:collapse;font-size:13px;}
+  .register thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap;}
+  .register tbody tr{border-bottom:1px solid var(--line);cursor:pointer;}
+  .register tbody tr:hover{background:#F1ECDE;}
+  .register td{padding:9px 10px;vertical-align:top;}
+  .id-cell{font-family:var(--font-mono);font-size:12px;color:var(--slate);}
+  .desc-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid transparent;}
+  .tag-assigned{background:#DCE7EE;color:#2B5B7A;border-color:#B7D0DE;}
+  .tag-inspection{background:#FBF0D9;color:#8A6314;border-color:#E9CE8F;}
+  .tag-approved{background:#DDEAE2;color:var(--sage);border-color:#B7D4C2;}
+  .tag-rework{background:#F4DEDA;color:var(--brick);border-color:#E3B7AE;}
+  .prio{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;}
+  .prio-Urgent{background:var(--brick);color:#fff;}
+  .prio-High{background:#E7C9A6;color:#7A4315;}
+  .prio-Medium{background:#EFE7CE;color:#7A6314;}
+  .prio-Low{background:#E4E9E2;color:#4B5A4E;}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--slate);}
+  .empty .big{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-bottom:4px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,26,24,0.45);display:flex;justify-content:flex-end;z-index:50;}
+  .drawer{width:min(600px,100%);background:var(--paper);height:100%;overflow-y:auto;border-left:4px solid var(--gold);}
+  .drawer-head{background:var(--teal-deep);color:#EFE9DA;padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  .drawer-head .idm{font-family:var(--font-mono);font-size:11px;color:#C9BFA0;}
+  .drawer-head h3{margin:2px 0 0;font-family:var(--font-display);font-size:18px;}
+  .drawer-close{background:none;border:none;color:#EFE9DA;font-size:20px;cursor:pointer;line-height:1;}
+  .drawer-body{padding:18px 20px;}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:13px;margin-bottom:14px;}
+  .kv .k{color:var(--slate);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;padding-top:1px;}
+  .desc-block{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;margin-bottom:16px;white-space:pre-wrap;}
+
+  .stamp-panel{border:1px dashed var(--line);border-radius:8px;padding:14px;margin-bottom:16px;background:#FCFBF8;}
+  .stamp-panel h4{margin:0 0 8px;font-family:var(--font-display);font-size:13px;}
+  .stamp-panel .hint{font-size:12px;color:var(--slate);margin-bottom:10px;}
+  .remark-input{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;min-height:56px;margin-bottom:10px;font-family:var(--font-body);}
+
+  .trail{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);margin-left:6px;}
+  .trail li{position:relative;padding:0 0 18px 18px;}
+  .trail li::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--dot,var(--slate));border:2px solid var(--paper);}
+  .trail .t-head{font-size:12.5px;font-weight:700;}
+  .trail .t-meta{font-size:11px;color:var(--slate);margin:1px 0 3px;}
+  .trail .t-remark{font-size:12.5px;background:var(--paper-raised);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:6px;}
+
+  .photo-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .photo-strip img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;}
+
+  .photo-picker{margin-bottom:10px;}
+  .photo-picker .drop{border:1.5px dashed var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--slate);cursor:pointer;text-align:center;background:#FCFBF8;}
+  .photo-picker .drop:hover{border-color:var(--gold);color:var(--ink);}
+  .photo-picker .preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .photo-picker .thumb{position:relative;width:64px;height:64px;}
+  .photo-picker .thumb img{width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .photo-picker .thumb .rm{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--brick);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;}
+  .photo-picker input[type=file]{display:none;}
+
+  .loading-note{padding:40px;text-align:center;color:var(--slate);font-size:13px;}
+  .banner{background:#FBF0D9;border:1px solid #E9CE8F;color:#7A5A10;border-radius:8px;padding:9px 13px;font-size:12.5px;margin-bottom:16px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.2);max-width:90vw;}
+  .lightbox{position:fixed;inset:0;background:rgba(10,14,13,0.9);display:flex;align-items:center;justify-content:center;z-index:150;cursor:zoom-out;padding:20px;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  const app = document.getElementById('app');
+  let session = null;
+  let tasks = [];
+  let categories = [];
+  let priorities = [];
+  let filters = { status:'all', category:'all', priority:'all', search:'' };
+  let activeDetailId = null;
+
+  const MAX_PHOTOS = 6;
+
+  async function api(path, opts){
+    const res = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
+    let data = {};
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  }
+
+  function toast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 3500);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }
+  function daysSince(iso){ return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); }
+  function statusTagClass(s){
+    return { 'Assigned':'tag-assigned','Submitted for Inspection':'tag-inspection','Approved':'tag-approved','Rework Needed':'tag-rework' }[s] || 'tag-assigned';
+  }
+  function dotColor(action){
+    if(/assigned/i.test(action)) return '#2B5B7A';
+    if(/submitted/i.test(action)) return '#B4842B';
+    if(/approved/i.test(action)) return '#3C6E47';
+    if(/returned/i.test(action)) return '#9C3B2E';
+    return '#5B6670';
+  }
+
+  // ---------------- Photo compression + picker ----------------
+  function compressImage(file, maxDim, quality){
+    maxDim = maxDim || 1200; quality = quality || 0.7;
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let { width, height } = img;
+          if(width > maxDim || height > maxDim){
+            if(width > height){ height = Math.round(height * maxDim/width); width = maxDim; }
+            else { width = Math.round(width * maxDim/height); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = ()=>reject(new Error('Could not read that image.'));
+        img.src = e.target.result;
+      };
+      reader.onerror = ()=>reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openLightbox(src){
+    const box = document.createElement('div');
+    box.className = 'lightbox';
+    box.innerHTML = `<img src="${src}" />`;
+    box.addEventListener('click', ()=>box.remove());
+    document.body.appendChild(box);
+  }
+
+  function photoStripHTML(photos){
+    if(!photos || !photos.length) return '';
+    return `<div class="photo-strip">${photos.map(p=>`<img src="${p}" data-full="${p}" />`).join('')}</div>`;
+  }
+
+  // Renders a self-contained "attach photos" widget. `photosRef` is an
+  // object like {list: []} so callers can read the current selection at
+  // submit time. `required` just changes the hint text — enforcement
+  // happens where the button handler reads photosRef.list.
+  function renderPhotoPicker(container, photosRef, opts){
+    opts = opts || {};
+    const inputId = 'file-' + Math.random().toString(36).slice(2);
+    container.innerHTML = `
+      <div class="photo-picker">
+        <label class="drop" for="${inputId}">📷 ${opts.label || 'Add photos'} (${opts.required ? 'at least 1 required' : 'optional'}, up to ${MAX_PHOTOS})</label>
+        <input type="file" id="${inputId}" accept="image/*" capture="environment" multiple />
+        <div class="preview" id="${inputId}-preview"></div>
+      </div>
+    `;
+    const input = container.querySelector('#' + inputId);
+    const preview = container.querySelector('#' + inputId + '-preview');
+
+    function renderPreview(){
+      preview.innerHTML = photosRef.list.map((p, i)=>`
+        <div class="thumb">
+          <img src="${p}" data-idx="${i}" />
+          <button type="button" class="rm" data-idx="${i}">×</button>
+        </div>
+      `).join('');
+      preview.querySelectorAll('.rm').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          photosRef.list.splice(Number(btn.getAttribute('data-idx')), 1);
+          renderPreview();
+        });
+      });
+      preview.querySelectorAll('img').forEach(img=>{
+        img.addEventListener('click', ()=>openLightbox(img.src));
+      });
+    }
+    renderPreview();
+
+    input.addEventListener('change', async ()=>{
+      const files = Array.from(input.files || []);
+      if(!files.length) return;
+      const room = MAX_PHOTOS - photosRef.list.length;
+      if(room <= 0){ toast(`You can attach up to ${MAX_PHOTOS} photos.`); input.value=''; return; }
+      const toProcess = files.slice(0, room);
+      if(files.length > room) toast(`Only added ${room} more — ${MAX_PHOTOS} photo limit reached.`);
+      try{
+        const compressed = await Promise.all(toProcess.map(f=>compressImage(f)));
+        photosRef.list.push(...compressed);
+        renderPreview();
+      }catch(err){
+        toast(err.message);
+      }
+      input.value = '';
+    });
+  }
+
+  // ---------------- LOGIN ----------------
+  const CHECKER_TYPES = ['Resident', 'RWA Committee Member', 'Estate Office Staff'];
+
+  function renderLogin(errorMsg){
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="eyebrow">La Lagune RWA · Painting Project</div>
+          <h1>Painting Project Tracker</h1>
+          <div class="sub">The project manager assigns work to the contractor here. Once a piece of work is done, it's submitted with photos for a resident or RWA member to inspect and approve.</div>
+          ${errorMsg ? `<div class="err">${escapeHtml(errorMsg)}</div>` : ''}
+          <form id="loginForm">
+            <label for="role">I am</label>
+            <select id="role">
+              <option value="staff">Project Manager / Estate Office</option>
+              <option value="checker">Resident / RWA Inspector</option>
+            </select>
+
+            <div id="checkerTypeField" style="display:none;">
+              <label for="checkerType">Acting as</label>
+              <select id="checkerType">
+                ${CHECKER_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}
+              </select>
+            </div>
+
+            <label for="name">Your name</label>
+            <input id="name" type="text" placeholder="e.g. Ramesh, or Mrs. Sharma (B-402)" autocomplete="name" required />
+
+            <label for="code">Access code</label>
+            <input id="code" type="password" placeholder="Shared code for this role" autocomplete="current-password" required />
+
+            <button class="btn btn-primary" style="width:100%;margin-top:18px;" type="submit">Sign in</button>
+          </form>
+        </div>
+      </div>
+    `;
+    const roleSelect = document.getElementById('role');
+    const checkerTypeField = document.getElementById('checkerTypeField');
+    function syncCheckerField(){ checkerTypeField.style.display = roleSelect.value === 'checker' ? 'block' : 'none'; }
+    roleSelect.addEventListener('change', syncCheckerField);
+    syncCheckerField();
+
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const role = roleSelect.value;
+      const name = document.getElementById('name').value.trim();
+      const code = document.getElementById('code').value;
+      const checkerType = role === 'checker' ? document.getElementById('checkerType').value : undefined;
+      try{
+        const data = await api('/api/login', { method:'POST', body: JSON.stringify({ role, name, code, checkerType }) });
+        session = data.user;
+        await boot();
+      }catch(err){
+        renderLogin(err.message);
+      }
+    });
+  }
+
+  // ---------------- APP SHELL ----------------
+  async function loadTasks(){
+    const data = await api('/api/tasks');
+    tasks = data.tasks;
+    categories = data.categories;
+    priorities = data.priorities;
+  }
+
+  function filteredTasks(){
+    return tasks.filter(t=>{
+      if(filters.status !== 'all' && t.status !== filters.status) return false;
+      if(filters.category !== 'all' && t.category !== filters.category) return false;
+      if(filters.priority !== 'all' && t.priority !== filters.priority) return false;
+      if(filters.search){
+        const s = filters.search.toLowerCase();
+        if(!(t.id.toLowerCase().includes(s) || (t.tower||'').toLowerCase().includes(s) || t.locationDetail.toLowerCase().includes(s) || t.description.toLowerCase().includes(s) || (t.contractorName||'').toLowerCase().includes(s))) return false;
+      }
+      return true;
+    });
+  }
+
+  function summaryCounts(){
+    const s = {total:tasks.length, assigned:0, inspection:0, approved:0, rework:0};
+    tasks.forEach(t=>{
+      if(t.status==='Assigned') s.assigned++;
+      if(t.status==='Submitted for Inspection') s.inspection++;
+      if(t.status==='Approved') s.approved++;
+      if(t.status==='Rework Needed') s.rework++;
+    });
+    return s;
+  }
+
+  function renderApp(){
+    const s = summaryCounts();
+    const list = filteredTasks();
+    const isStaff = session.role === 'staff';
+
+    app.innerHTML = `
+      <div class="plate">
+        <div>
+          <div class="plate-eyebrow">La Lagune RWA &middot; Painting Project</div>
+          <div class="plate-title"><h1>Painting Project Tracker</h1></div>
+          <div class="plate-sub">The project manager logs each task for the contractor. Once work is done, it's submitted with photos — a resident or RWA member inspects and approves, or sends it back for rework.</div>
+        </div>
+        <div class="identity-box">
+          <div class="who">${escapeHtml(session.displayName)}</div>
+          <div class="role-tag">${isStaff ? 'Project Manager' : escapeHtml(session.checkerType || 'Checker') + ' · Inspector'}</div>
+          <button id="logoutBtn">Sign out</button>
+        </div>
+      </div>
+      <div class="wrap" id="wrap"></div>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+      await api('/api/logout', { method:'POST' });
+      session = null; tasks = []; activeDetailId = null;
+      renderLogin();
+    });
+
+    const wrap = document.getElementById('wrap');
+    wrap.innerHTML = `
+      <div class="summary-grid">
+        <div class="stat" style="--bar:var(--slate)"><div class="n">${s.total}</div><div class="l">Total tasks</div></div>
+        <div class="stat" style="--bar:#2B5B7A"><div class="n">${s.assigned}</div><div class="l">Assigned</div></div>
+        <div class="stat" style="--bar:#B4842B"><div class="n">${s.inspection}</div><div class="l">Awaiting inspection</div></div>
+        <div class="stat" style="--bar:#3C6E47"><div class="n">${s.approved}</div><div class="l">Approved</div></div>
+        <div class="stat" style="--bar:#9C3B2E"><div class="n">${s.rework}</div><div class="l">Rework needed</div></div>
+      </div>
+
+      ${isStaff ? `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">PM</span> Assign a new painting task</h2></div>
+        <div class="panel-body">
+          <div class="banner">Log the scope of work for the contractor here. Once they've finished, come back and submit it for inspection with photos.</div>
+          <div class="form-grid">
+            <div class="field"><label for="f-category">Work area</label><select id="f-category">${categories.map(c=>`<option>${c}</option>`).join('')}</select></div>
+            <div class="field"><label for="f-tower">Tower (if applicable)</label><input id="f-tower" type="text" placeholder="e.g. B, or leave blank" /></div>
+            <div class="field span-2"><label for="f-location">Location detail</label><input id="f-location" type="text" placeholder="e.g. North & East exterior face, Ground floor corridor" /></div>
+            <div class="field"><label for="f-contractor">Contractor / team (optional)</label><input id="f-contractor" type="text" placeholder="e.g. Shree Painters" /></div>
+            <div class="field"><label for="f-priority">Priority</label><select id="f-priority">${priorities.map(p=>`<option>${p}</option>`).join('')}</select></div>
+            <div class="field span-4"><label for="f-desc">Scope of work</label><textarea id="f-desc" placeholder="e.g. Scrape old paint, 2 coats primer, 2 coats exterior emulsion, repair visible cracks…"></textarea></div>
+            <div class="field span-4" id="newTaskPhotoContainer"></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" id="submitBtn">Assign task</button></div>
+        </div>
+      </div>` : `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">Inspector</span> Your review queue</h2></div>
+        <div class="panel-body"><div class="banner">Tasks move here once the PM submits completed work for inspection. Review the photos, then approve or send back for rework with a note.</div></div>
+      </div>`}
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Task register</h2>
+          <div class="filter-row">
+            <input id="searchInput" type="text" placeholder="Search location, ID, contractor…" value="${escapeHtml(filters.search)}" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option>Assigned</option><option>Submitted for Inspection</option><option>Approved</option><option>Rework Needed</option>
+            </select>
+            <select id="categoryFilter"><option value="all">All work areas</option>${categories.map(c=>`<option>${c}</option>`).join('')}</select>
+            <select id="priorityFilter"><option value="all">All priorities</option>${priorities.map(p=>`<option>${p}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          ${list.length ? `
+          <div style="overflow-x:auto;">
+          <table class="register">
+            <thead><tr><th>ID</th><th>Assigned</th><th>Work Area</th><th>Location</th><th>Contractor</th><th>Priority</th><th>Status</th><th>Inspector</th></tr></thead>
+            <tbody>
+              ${list.map(t=>`
+                <tr data-id="${t.id}">
+                  <td class="id-cell">${t.id}</td>
+                  <td>${fmtDate(t.createdAt)}</td>
+                  <td>${escapeHtml(t.category)}</td>
+                  <td class="desc-cell">${escapeHtml(t.locationDetail)}</td>
+                  <td>${escapeHtml(t.contractorName) || '—'}</td>
+                  <td><span class="prio prio-${t.priority}">${t.priority}</span></td>
+                  <td><span class="tag ${statusTagClass(t.status)}">${t.status}</span></td>
+                  <td>${escapeHtml(t.checker) || '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          </div>` : `<div class="empty"><div class="big">No tasks match these filters</div>Adjust filters above, or assign a new task.</div>`}
+        </div>
+      </div>
+    `;
+
+    if(isStaff){
+      const newTaskPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('newTaskPhotoContainer'), newTaskPhotos, { label: 'Current condition photos' });
+
+      document.getElementById('submitBtn').addEventListener('click', async ()=>{
+        const category = document.getElementById('f-category').value;
+        const tower = document.getElementById('f-tower').value.trim();
+        const locationDetail = document.getElementById('f-location').value.trim();
+        const contractorName = document.getElementById('f-contractor').value.trim();
+        const priority = document.getElementById('f-priority').value;
+        const description = document.getElementById('f-desc').value.trim();
+        if(!locationDetail || !description){ toast('Please fill in the location and scope of work.'); return; }
+        try{
+          await api('/api/tasks', { method:'POST', body: JSON.stringify({ category, tower, locationDetail, contractorName, priority, description, photos: newTaskPhotos.list })});
+          toast('Task assigned.');
+          await refresh();
+        }catch(err){ toast(err.message); }
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e)=>{ filters.search = e.target.value; renderApp(); });
+    document.getElementById('statusFilter').value = filters.status;
+    document.getElementById('statusFilter').addEventListener('change', (e)=>{ filters.status = e.target.value; renderApp(); });
+    document.getElementById('categoryFilter').value = filters.category;
+    document.getElementById('categoryFilter').addEventListener('change', (e)=>{ filters.category = e.target.value; renderApp(); });
+    document.getElementById('priorityFilter').value = filters.priority;
+    document.getElementById('priorityFilter').addEventListener('change', (e)=>{ filters.priority = e.target.value; renderApp(); });
+
+    wrap.querySelectorAll('tbody tr').forEach(tr=>{
+      tr.addEventListener('click', ()=> openDetail(tr.getAttribute('data-id')));
+    });
+
+    if(activeDetailId) renderDetail(activeDetailId);
+  }
+
+  async function refresh(){
+    await loadTasks();
+    renderApp();
+  }
+
+  function openDetail(id){ activeDetailId = id; renderDetail(id); }
+  function closeDetail(){ activeDetailId = null; const ov = document.getElementById('detailOverlay'); if(ov) ov.remove(); }
+
+  function renderDetail(id){
+    const existing = document.getElementById('detailOverlay');
+    if(existing) existing.remove();
+    const t = tasks.find(x=>x.id===id);
+    if(!t) return;
+    const isStaff = session.role === 'staff';
+
+    let actionPanel = '';
+    if(isStaff && (t.status==='Assigned' || t.status==='Rework Needed')){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Submit completed work for inspection</h4>
+          <div class="hint">Once the contractor finishes this, attach photos of the finished work and submit it for a resident/RWA inspector to review.</div>
+          <textarea class="remark-input" id="markReadyRemark" placeholder="Any notes for the inspector (optional)…"></textarea>
+          <div id="markReadyPhotoContainer"></div>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-primary btn-small" id="markReadyBtn">Submit for inspection</button>
+          </div>
+        </div>`;
+    } else if(!isStaff && t.status==='Submitted for Inspection'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Inspect this work</h4>
+          <div class="hint">Review the completion photos above (and the site, if you can), then approve or send it back for rework with a note.</div>
+          <textarea class="remark-input" id="reviewRemark" placeholder="Remarks (optional for approval, required if sending back)…"></textarea>
+          <div id="reviewPhotoContainer"></div>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button class="btn btn-approve btn-small" id="approveBtn">Approve</button>
+            <button class="btn btn-return btn-small" id="returnBtn">Send back — rework needed</button>
+          </div>
+        </div>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.id = 'detailOverlay';
+    overlay.innerHTML = `
+      <div class="drawer">
+        <div class="drawer-head">
+          <div><div class="idm">${t.id}</div><h3>${escapeHtml(t.category)}</h3></div>
+          <button class="drawer-close" id="closeDrawer" aria-label="Close">&times;</button>
+        </div>
+        <div class="drawer-body">
+          <div class="kv">
+            <div class="k">Status</div><div><span class="tag ${statusTagClass(t.status)}">${t.status}</span></div>
+            <div class="k">Priority</div><div><span class="prio prio-${t.priority}">${t.priority}</span></div>
+            <div class="k">Tower</div><div>${escapeHtml(t.tower) || '—'}</div>
+            <div class="k">Location</div><div>${escapeHtml(t.locationDetail)}</div>
+            <div class="k">Contractor</div><div>${escapeHtml(t.contractorName) || '—'}</div>
+            <div class="k">Assigned by</div><div>${escapeHtml(t.loggedBy)}</div>
+            <div class="k">Assigned on</div><div>${fmtDate(t.createdAt)}</div>
+            <div class="k">Inspector</div><div>${escapeHtml(t.checker) || 'Not yet reviewed'}</div>
+          </div>
+          <div class="desc-block">${escapeHtml(t.description)}</div>
+          ${actionPanel}
+          <h4 style="font-family:var(--font-display);font-size:13px;margin:18px 0 10px;">Activity &amp; photos</h4>
+          <ul class="trail">
+            ${t.audit.slice().reverse().map(a=>`
+              <li style="--dot:${dotColor(a.action)}">
+                <div class="t-head">${escapeHtml(a.action)}</div>
+                <div class="t-meta">${escapeHtml(a.actor)} (${a.role==='staff'?'Project Manager':escapeHtml(a.checkerType || 'Inspector')}) · ${fmtDate(a.timestamp)}</div>
+                ${a.remark ? `<div class="t-remark">${escapeHtml(a.remark)}</div>` : ''}
+                ${photoStripHTML(a.photos)}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeDetail(); });
+    document.getElementById('closeDrawer').addEventListener('click', closeDetail);
+    overlay.querySelectorAll('.photo-strip img').forEach(img=>{
+      img.addEventListener('click', ()=>openLightbox(img.getAttribute('data-full')));
+    });
+
+    if(isStaff && (t.status==='Assigned' || t.status==='Rework Needed')){
+      const markReadyPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('markReadyPhotoContainer'), markReadyPhotos, { label: 'Completed work photos', required: true });
+      document.getElementById('markReadyBtn').addEventListener('click', async ()=>{
+        if(markReadyPhotos.list.length === 0){ toast('Please attach at least one photo of the completed work.'); return; }
+        try{
+          await api(`/api/tasks/${t.id}/mark-ready`, { method:'POST', body: JSON.stringify({ remark: document.getElementById('markReadyRemark').value.trim(), photos: markReadyPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+    } else if(!isStaff && t.status==='Submitted for Inspection'){
+      const reviewPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('reviewPhotoContainer'), reviewPhotos, { label: 'Your own photos' });
+      document.getElementById('approveBtn').addEventListener('click', async ()=>{
+        try{
+          await api(`/api/tasks/${t.id}/approve`, { method:'POST', body: JSON.stringify({ remark: document.getElementById('reviewRemark').value.trim(), photos: reviewPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+      document.getElementById('returnBtn').addEventListener('click', async ()=>{
+        const remark = document.getElementById('reviewRemark').value.trim();
+        if(!remark){ toast('Please explain what needs rework.'); return; }
+        try{
+          await api(`/api/tasks/${t.id}/return`, { method:'POST', body: JSON.stringify({ remark, photos: reviewPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+    }
+  }
+
+  async function boot(){
+    app.innerHTML = '<div class="loading-note">Loading tasks…</div>';
+    try{
+      if(!session){
+        const s = await api('/api/session');
+        session = s.user;
+      }
+      if(!session){ renderLogin(); return; }
+      await loadTasks();
+      renderApp();
+    }catch(err){
+      renderLogin(err.message);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
