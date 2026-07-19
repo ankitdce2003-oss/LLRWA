@@ -1,62 +1,67 @@
-# La Lagune RWA — Complaint & Observation Tracker (Vercel edition)
+# La Lagune RWA — Painting Project Tracker
 
-A complaint/observation register for the estate office, with a maker-checker
-approval workflow: estate office staff log entries, and a resident or RWA
-committee member must approve, return, or close them. Every action is
-recorded in an audit trail.
+A dedicated tracker for the society's painting project. The project manager
+(estate office) assigns tasks to the contractor; once a piece of work is
+done, it's submitted with photos for a resident or RWA committee member to
+inspect and approve — or send back for rework.
 
-## How sign-in works
-
-There are no individual accounts. Instead there are **two shared access
-codes** — one for the Staff (maker) role, one for the Checker role. Anyone
-who has the relevant code can sign in as that role, typing their own name
-each time. Checkers also pick who they're acting as when they sign in:
-**Resident**, **RWA Committee Member**, or **Estate Office Staff** (for a
-staff member covering a checker's review). Whatever they type/pick is what
-shows up in the audit trail on every action they take — so you still get a
-real record of who did what, without managing a login for every person.
-
-Treat both codes like shared passwords: give the Staff code to your estate
-office team, and the Checker code to your RWA committee and any residents
-you want reviewing entries. Change them (just update the environment
-variables and redeploy) if you ever need to revoke access broadly.
+The contractor doesn't use this tool directly — the project manager logs
+tasks and submits completion photos on the contractor's behalf.
 
 ## How the workflow works
 
-`Pending Review` → (checker approves) → `Approved` → (staff marks resolved) →
-`Resolved` → (checker verifies) → `Verified & Closed`
+```
+Assigned ──(PM submits with photos)──> Submitted for Inspection
+                                              │
+                          ┌───────────────────┼───────────────────┐
+                          │                                       │
+                     Approved                              Rework Needed
+                     (done)                                       │
+                                              (PM resubmits with new photos)
+                                                    back to Submitted for Inspection
+```
 
-At any review point the checker can **Return** an entry with a remark; staff
-then correct it and resubmit, which puts it back in `Pending Review`.
+- **Assigned** — PM logs the task: work area, location, contractor, scope,
+  and optionally "current condition" photos.
+- **Submitted for Inspection** — PM marks it done once the contractor
+  finishes, attaching at least one photo of the completed work. This is
+  required — inspection depends on having something to look at.
+- **Approved** — a resident or RWA member reviewed and signed off. Done.
+- **Rework Needed** — the inspector sent it back with a note on what needs
+  fixing. The PM gets the contractor to redo it, then resubmits (with new
+  photos) to go back to Submitted for Inspection.
 
-## Deploying on Vercel
+Photos can be attached at every step — task creation, submission for
+inspection, and both approval and rework — so the full visual history of
+each task lives in its activity trail, not scattered across phones.
 
-1. **Push this folder to a GitHub repository**, then in Vercel: **Add New →
-   Project → Import** that repository. Leave build settings as default —
-   `vercel.json` routes everything through `api/index.js`.
+## How sign-in works
 
-2. **Add a Postgres database.** In the project's Storage tab → Create
-   Database → **Neon** (Serverless Postgres). When connecting it to the
-   project, clear the "Custom Environment Variable Prefix" field so the
-   variable is created as plain `POSTGRES_URL` rather than a prefixed name
-   — the app looks for `POSTGRES_URL` or `DATABASE_URL` specifically.
+No individual accounts — two shared access codes, same as before:
+`STAFF_ACCESS_CODE` for the project manager / estate office side,
+`CHECKER_ACCESS_CODE` for residents and RWA committee members. Everyone
+types their own name at sign-in, and checkers additionally pick who they're
+acting as (Resident / RWA Committee Member / Estate Office Staff), which is
+what shows up in the activity trail on every action.
 
-3. **Add three environment variables** in Settings → Environment Variables:
-   - `JWT_SECRET` — any long random string (e.g. generate with
-     `openssl rand -hex 32`)
-   - `STAFF_ACCESS_CODE` — the code you'll give your estate office team
-   - `CHECKER_ACCESS_CODE` — the code you'll give residents/committee members
+## Deploying / updating on Vercel
 
-4. **Redeploy** (Deployments tab → ⋮ on the latest deployment → Redeploy)
-   so the new environment variables and database connection take effect.
+Hosting is unchanged from before — same Vercel project, same Postgres
+database, same three environment variables (`JWT_SECRET`,
+`STAFF_ACCESS_CODE`, `CHECKER_ACCESS_CODE`). To pick up this update:
 
-5. **Visit your `.vercel.app` URL**, sign in with either code, and you're
-   in. Share the Staff code and Checker code with the relevant people
-   directly (in person, a shared note, however you'd share any password) —
-   there's no invite/email flow, just the code.
-
-The database table is created automatically the first time the app runs —
-no manual setup step needed.
+1. Replace `server.js`, `db.js`, and `public/index.html` in your GitHub
+   repository with the versions in this zip (open each file on GitHub,
+   click the pencil/edit icon, select all, paste the new contents, commit).
+2. No environment variable changes needed — the same three variables are
+   still used.
+3. **Database note:** this version uses a new table (`tasks`) instead of
+   the old `complaints` table, so nothing from before carries over
+   automatically. The new table is created automatically on first run —
+   no manual step needed. If you want to get rid of the old, now-unused
+   `complaints` table, you can drop it from your database's SQL console,
+   but it's harmless to just leave it there unused.
+4. Redeploy (Deployments tab → ⋮ → Redeploy), then revisit your site.
 
 ## Local development
 
@@ -68,22 +73,19 @@ npm start
 ```
 Then open http://localhost:3000.
 
-## Notes on this architecture
+## Notes on photos
 
-- **No file storage.** Complaints (including the full audit trail, stored
-  as JSONB) live in Postgres. Back up the database via Neon/Vercel's own
-  tools — there's nothing on disk to back up manually.
-- **Concurrency-safe updates.** Approve/return/resolve/verify actions use a
-  row lock inside a transaction, so two people acting on the same entry at
-  once can't corrupt its state.
-- **Access codes over accounts.** This trades per-person authentication for
-  simplicity — anyone with a code can act in that role under any name they
-  type. That's an intentional fit for a small, trusted community; it means
-  the audit trail records what people *say* their name is, not a verified
-  identity. If you later want real verified accounts instead, that's a
-  bigger change (back to a users table + passwords) — say the word and it
-  can be rebuilt that way.
-- **Rate limiting is best-effort.** `express-rate-limit`'s in-memory counter
-  resets whenever a serverless instance cold-starts, so it slows down
-  casual code-guessing but isn't a hard guarantee on Vercel's serverless
-  model.
+- Photos are compressed in the browser before upload (resized to a max of
+  1200px on the longest side, JPEG quality ~70%) to keep file sizes
+  reasonable — typically well under 500KB each even from a modern phone
+  camera.
+- They're stored as part of the task's record in Postgres (base64-encoded),
+  not in a separate file storage service — this keeps setup simple (no
+  extra storage product to configure) at the cost of some database size.
+  For a project with dozens of tasks and a handful of photos each, this
+  comfortably fits within Neon's free tier. If the project scales up
+  significantly (hundreds of tasks with many photos each), moving to
+  Vercel Blob storage would be the next step — that's a contained change
+  to how photos are stored, not a redesign of the workflow.
+- Up to 6 photos per action, ~1.5MB raw size each, are accepted; the app
+  rejects anything over that rather than silently failing.

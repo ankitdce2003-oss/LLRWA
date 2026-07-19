@@ -8,7 +8,7 @@ const path = require('path');
 
 const db = require('./db');
 
-// Creates the complaints table/sequence if they don't exist yet. Safe to run
+// Creates the tasks table/sequence if they don't exist yet. Safe to run
 // every cold start — CREATE TABLE IF NOT EXISTS is a no-op once it exists.
 db.initSchema().catch((err) => console.error('Failed to initialize database schema', err));
 
@@ -29,6 +29,7 @@ app.set('trust proxy', 1);
 // The frontend is a single HTML file with an inline <script> and <style>
 // block (no build step / bundler), so the default CSP — which blocks
 // inline scripts and styles — has to be relaxed for those two directives.
+// img-src allows data: URIs since photos are stored/sent as base64.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -41,7 +42,10 @@ app.use(
     },
   })
 );
-app.use(express.json());
+// Raised from Express's 100kb default to accommodate a handful of
+// compressed photos per request (photos are compressed client-side before
+// upload, but several at once can still add up).
+app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
 
 const loginLimiter = rateLimit({
@@ -122,11 +126,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     resolvedCheckerType = checkerType;
   }
 
-  const sessionUser = {
-    role,
-    displayName: name.trim(),
-    checkerType: resolvedCheckerType,
-  };
+  const sessionUser = { role, displayName: name.trim(), checkerType: resolvedCheckerType };
   setSessionCookie(res, sessionUser);
   res.json({ user: sessionUser });
 });
@@ -140,106 +140,110 @@ app.get('/api/session', (req, res) => {
   res.json({ user: readUserFromCookie(req) });
 });
 
-// ---------- complaint constants ----------
+// ---------- task constants ----------
 const CATEGORIES = [
-  'Plumbing', 'Electricity', 'Paint', 'Car Parking', 'Carpenting',
-  'Civil Work', 'Common Area', 'Horticulture', 'Housekeeping', 'Lift', 'Security',
+  'Exterior Walls', 'Common Area / Corridors', 'Compound Wall', 'Clubhouse',
+  'Parking Area', 'Terrace / Roof', 'Garden / Landscape Structures',
+  'Main Gate / Entrance', 'Staircase', 'Other',
 ];
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
+const MAX_PHOTOS_PER_ACTION = 6;
+const MAX_PHOTO_CHARS = 2_000_000; // ~1.5MB raw per photo after base64 overhead
 
-function makeAudit(action, user, remark) {
+function validatePhotos(photos) {
+  if (photos === undefined || photos === null) return [];
+  if (!Array.isArray(photos)) return null;
+  if (photos.length > MAX_PHOTOS_PER_ACTION) return null;
+  for (const p of photos) {
+    if (typeof p !== 'string' || !p.startsWith('data:image/') || p.length > MAX_PHOTO_CHARS) {
+      return null;
+    }
+  }
+  return photos;
+}
+
+function makeAudit(action, user, remark, photos) {
   return {
     action,
     actor: user.displayName,
     role: user.role,
     checkerType: user.checkerType || null,
     remark: remark || '',
+    photos: photos || [],
     timestamp: new Date().toISOString(),
   };
 }
 
-// ---------- complaint routes ----------
-app.get('/api/complaints', requireAuth, async (req, res) => {
-  const complaints = await db.getComplaints();
-  res.json({ complaints, categories: CATEGORIES, priorities: PRIORITIES });
+// ---------- task routes ----------
+app.get('/api/tasks', requireAuth, async (req, res) => {
+  const tasks = await db.getTasks();
+  res.json({ tasks, categories: CATEGORIES, priorities: PRIORITIES });
 });
 
-app.post('/api/complaints', requireRole('staff'), async (req, res) => {
-  const { tower, unit, residentName, category, priority, description } = req.body || {};
-  if (!tower || !unit || !description || !category || !priority) {
-    return res.status(400).json({ error: 'Tower, unit, category, priority and description are required.' });
+app.post('/api/tasks', requireRole('staff'), async (req, res) => {
+  const { category, tower, locationDetail, contractorName, priority, description, photos } = req.body || {};
+  if (!category || !locationDetail || !priority || !description) {
+    return res.status(400).json({ error: 'Category, location, priority and scope of work are all required.' });
   }
   if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category.' });
   if (!PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority.' });
+  const validPhotos = validatePhotos(photos);
+  if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
 
-  const complaint = await db.createComplaint({
-    tower: String(tower).trim(),
-    unit: String(unit).trim(),
-    residentName: (residentName || '').trim(),
+  const task = await db.createTask({
     category,
+    tower: (tower || '').trim(),
+    locationDetail: String(locationDetail).trim(),
+    contractorName: (contractorName || '').trim(),
     priority,
     description: String(description).trim(),
     loggedBy: req.user.displayName,
-    auditEntry: makeAudit('Logged', req.user, 'Entry recorded by estate office.'),
+    auditEntry: makeAudit('Task assigned', req.user, 'Task created and assigned to contractor.', validPhotos),
   });
-  res.status(201).json({ complaint });
+  res.status(201).json({ task });
 });
 
-app.post('/api/complaints/:id/approve', requireRole('checker'), async (req, res) => {
-  const result = await db.updateComplaint(req.params.id, ['Pending Review'], () => ({
+app.post('/api/tasks/:id/mark-ready', requireRole('staff'), async (req, res) => {
+  const validPhotos = validatePhotos(req.body?.photos);
+  if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
+  if (validPhotos.length === 0) {
+    return res.status(400).json({ error: 'Please attach at least one photo of the completed work.' });
+  }
+  const result = await db.updateTask(req.params.id, ['Assigned', 'Rework Needed'], () => ({
+    status: 'Submitted for Inspection',
+    auditEntry: makeAudit('Submitted for inspection', req.user, req.body?.remark || '', validPhotos),
+  }));
+  if (result.error === 'not_found') return res.status(404).json({ error: 'Task not found.' });
+  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only assigned or rework-needed tasks can be submitted for inspection.' });
+  res.json({ task: result.task });
+});
+
+app.post('/api/tasks/:id/approve', requireRole('checker'), async (req, res) => {
+  const validPhotos = validatePhotos(req.body?.photos);
+  if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
+  const result = await db.updateTask(req.params.id, ['Submitted for Inspection'], () => ({
     status: 'Approved',
     checker: req.user.displayName,
-    auditEntry: makeAudit('Approved', req.user, req.body?.remark || ''),
+    auditEntry: makeAudit('Approved', req.user, req.body?.remark || '', validPhotos),
   }));
-  if (result.error === 'not_found') return res.status(404).json({ error: 'Entry not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only entries pending review can be approved.' });
-  res.json({ complaint: result.complaint });
+  if (result.error === 'not_found') return res.status(404).json({ error: 'Task not found.' });
+  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only tasks submitted for inspection can be approved.' });
+  res.json({ task: result.task });
 });
 
-app.post('/api/complaints/:id/return', requireRole('checker'), async (req, res) => {
+app.post('/api/tasks/:id/return', requireRole('checker'), async (req, res) => {
   const remark = (req.body?.remark || '').trim();
-  if (!remark) return res.status(400).json({ error: 'A remark is required when returning an entry.' });
-  const result = await db.updateComplaint(req.params.id, ['Pending Review', 'Resolved'], () => ({
-    status: 'Returned',
+  if (!remark) return res.status(400).json({ error: 'Please explain what needs rework.' });
+  const validPhotos = validatePhotos(req.body?.photos);
+  if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
+  const result = await db.updateTask(req.params.id, ['Submitted for Inspection'], () => ({
+    status: 'Rework Needed',
     checker: req.user.displayName,
-    auditEntry: makeAudit('Returned for correction', req.user, remark),
+    auditEntry: makeAudit('Returned — rework needed', req.user, remark, validPhotos),
   }));
-  if (result.error === 'not_found') return res.status(404).json({ error: 'Entry not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'This entry cannot be returned from its current status.' });
-  res.json({ complaint: result.complaint });
-});
-
-app.post('/api/complaints/:id/resubmit', requireRole('staff'), async (req, res) => {
-  const result = await db.updateComplaint(req.params.id, ['Returned'], () => ({
-    status: 'Pending Review',
-    auditEntry: makeAudit('Resubmitted', req.user, req.body?.remark || ''),
-  }));
-  if (result.error === 'not_found') return res.status(404).json({ error: 'Entry not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only returned entries can be resubmitted.' });
-  res.json({ complaint: result.complaint });
-});
-
-app.post('/api/complaints/:id/resolve', requireRole('staff'), async (req, res) => {
-  const remark = (req.body?.remark || '').trim();
-  if (!remark) return res.status(400).json({ error: 'Please describe how this was resolved.' });
-  const result = await db.updateComplaint(req.params.id, ['Approved'], () => ({
-    status: 'Resolved',
-    resolutionNotes: remark,
-    auditEntry: makeAudit('Marked resolved by staff', req.user, remark),
-  }));
-  if (result.error === 'not_found') return res.status(404).json({ error: 'Entry not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only approved entries can be marked resolved.' });
-  res.json({ complaint: result.complaint });
-});
-
-app.post('/api/complaints/:id/verify', requireRole('checker'), async (req, res) => {
-  const result = await db.updateComplaint(req.params.id, ['Resolved'], () => ({
-    status: 'Verified & Closed',
-    auditEntry: makeAudit('Verified and closed', req.user, req.body?.remark || ''),
-  }));
-  if (result.error === 'not_found') return res.status(404).json({ error: 'Entry not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only resolved entries can be verified and closed.' });
-  res.json({ complaint: result.complaint });
+  if (result.error === 'not_found') return res.status(404).json({ error: 'Task not found.' });
+  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only tasks submitted for inspection can be returned.' });
+  res.json({ task: result.task });
 });
 
 // ---------- static frontend ----------
@@ -248,11 +252,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// When run directly (`node server.js`, e.g. local dev or a VPS), start listening.
-// When imported (e.g. by api/index.js on Vercel), just export the app.
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`La Lagune complaint tracker running on port ${PORT}`);
+    console.log(`La Lagune painting project tracker running on port ${PORT}`);
   });
 }
 
