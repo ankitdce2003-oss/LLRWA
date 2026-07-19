@@ -141,12 +141,10 @@ app.get('/api/session', (req, res) => {
 });
 
 // ---------- task constants ----------
-const CATEGORIES = [
-  'Exterior Walls', 'Common Area / Corridors', 'Compound Wall', 'Clubhouse',
-  'Parking Area', 'Terrace / Roof', 'Garden / Landscape Structures',
-  'Main Gate / Entrance', 'Staircase', 'Other',
+const WORK_LOCATIONS = [
+  'Balcony Front', 'Balcony Back', 'Refuge Area', 'External Wall', 'Flat Grill',
+  'Tower Lobby', 'Staircases', 'Basement 1', 'Basement 2', 'Others',
 ];
-const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 const MAX_PHOTOS_PER_ACTION = 6;
 const MAX_PHOTO_CHARS = 2_000_000; // ~1.5MB raw per photo after base64 overhead
 
@@ -177,28 +175,42 @@ function makeAudit(action, user, remark, photos) {
 // ---------- task routes ----------
 app.get('/api/tasks', requireAuth, async (req, res) => {
   const tasks = await db.getTasks();
-  res.json({ tasks, categories: CATEGORIES, priorities: PRIORITIES });
+  res.json({ tasks, workLocations: WORK_LOCATIONS });
 });
 
 app.post('/api/tasks', requireRole('staff'), async (req, res) => {
-  const { category, tower, locationDetail, contractorName, priority, description, photos } = req.body || {};
-  if (!category || !locationDetail || !priority || !description) {
-    return res.status(400).json({ error: 'Category, location, priority and scope of work are all required.' });
+  const { workLocation, workLocationOther, tower, flatNumber, contractorName, description, photos } = req.body || {};
+  if (!workLocation || !description) {
+    return res.status(400).json({ error: 'Work location and scope of work are required.' });
   }
-  if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category.' });
-  if (!PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority.' });
+  if (!WORK_LOCATIONS.includes(workLocation)) {
+    return res.status(400).json({ error: 'Invalid work location.' });
+  }
+  const otherText = (workLocationOther || '').trim();
+  if (workLocation === 'Others' && !otherText) {
+    return res.status(400).json({ error: 'Please specify the work location.' });
+  }
   const validPhotos = validatePhotos(photos);
   if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
 
-  const task = await db.createTask({
-    category,
+  const payload = {
+    workLocation,
+    workLocationOther: workLocation === 'Others' ? otherText : '',
     tower: (tower || '').trim(),
-    locationDetail: String(locationDetail).trim(),
+    flatNumber: (flatNumber || '').trim(),
     contractorName: (contractorName || '').trim(),
-    priority,
     description: String(description).trim(),
+  };
+
+  const duplicateId = await db.findActiveDuplicate(payload);
+  if (duplicateId) {
+    return res.status(409).json({ error: `An identical task is already active (${duplicateId}). Please check the register before logging it again.` });
+  }
+
+  const task = await db.createTask({
+    ...payload,
     loggedBy: req.user.displayName,
-    auditEntry: makeAudit('Task assigned', req.user, 'Task created and assigned to contractor.', validPhotos),
+    auditEntry: makeAudit('Task created', req.user, 'Task created — not yet sent for inspection.', validPhotos),
   });
   res.status(201).json({ task });
 });
@@ -206,15 +218,12 @@ app.post('/api/tasks', requireRole('staff'), async (req, res) => {
 app.post('/api/tasks/:id/mark-ready', requireRole('staff'), async (req, res) => {
   const validPhotos = validatePhotos(req.body?.photos);
   if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
-  if (validPhotos.length === 0) {
-    return res.status(400).json({ error: 'Please attach at least one photo of the completed work.' });
-  }
-  const result = await db.updateTask(req.params.id, ['Assigned', 'Rework Needed'], () => ({
+  const result = await db.updateTask(req.params.id, ['Assigned to Contractor', 'Rework Needed'], () => ({
     status: 'Submitted for Inspection',
-    auditEntry: makeAudit('Submitted for inspection', req.user, req.body?.remark || '', validPhotos),
+    auditEntry: makeAudit('Sent for inspection', req.user, req.body?.remark || '', validPhotos),
   }));
   if (result.error === 'not_found') return res.status(404).json({ error: 'Task not found.' });
-  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only assigned or rework-needed tasks can be submitted for inspection.' });
+  if (result.error === 'bad_status') return res.status(409).json({ error: 'Only tasks assigned to the contractor or needing rework can be sent for inspection.' });
   res.json({ task: result.task });
 });
 
