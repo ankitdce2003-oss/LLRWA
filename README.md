@@ -11,38 +11,63 @@ tasks and submits completion photos on the contractor's behalf.
 ## How the workflow works
 
 ```
-Assigned ──(PM submits with photos)──> Submitted for Inspection
+Assigned to Contractor ──(PM sends for inspection)──> Submitted for Inspection
                                               │
                           ┌───────────────────┼───────────────────┐
                           │                                       │
                      Approved                              Rework Needed
                      (done)                                       │
-                                              (PM resubmits with new photos)
+                                              (PM resends with updated details)
                                                     back to Submitted for Inspection
 ```
 
-- **Assigned** — PM logs the task: work area, location, contractor, scope,
-  and optionally "current condition" photos.
+- **Assigned to Contractor** — PM creates the task: work location, tower,
+  flat number (if applicable), contractor, scope of work, and optionally
+  "current condition" photos. The task sits here until the PM explicitly
+  sends it for inspection — creating it does **not** notify anyone.
 - **Submitted for Inspection** — PM marks it done once the contractor
-  finishes, attaching at least one photo of the completed work. This is
-  required — inspection depends on having something to look at.
+  finishes. Photos are optional at this step (helpful, not required).
 - **Approved** — a resident or RWA member reviewed and signed off. Done.
 - **Rework Needed** — the inspector sent it back with a note on what needs
-  fixing. The PM gets the contractor to redo it, then resubmits (with new
-  photos) to go back to Submitted for Inspection.
+  fixing. The PM gets the contractor to redo it, then resends it to go
+  back to Submitted for Inspection.
 
-Photos can be attached at every step — task creation, submission for
-inspection, and both approval and rework — so the full visual history of
-each task lives in its activity trail, not scattered across phones.
+**Work location** is chosen from a fixed list (Balcony Front, Balcony Back,
+Refuge Area, External Wall, Flat Grill, Tower Lobby, Staircases, Basement 1,
+Basement 2, or Others — Others requires typing in what the location is).
+
+**Duplicate protection:** the app blocks creating a task that exactly
+matches an existing *active* (not yet Approved) task — same work location,
+tower, flat number, and scope of work. Once a task is Approved, logging an
+identical one again later (e.g. a future repaint) is allowed — the block
+only prevents accidental double-entry while something is still in progress.
+
+The **task register table's column headers are sortable** — click any
+column to sort by it, click again to reverse the order. This works the
+same way for both the PM and the inspector, since it's the same table.
+
+Photos can be attached at task creation, when sending for inspection, and
+during approval or rework — so the full visual history of each task lives
+in its activity trail.
 
 ## How sign-in works
 
-No individual accounts — two shared access codes, same as before:
+No individual accounts — three shared access codes:
 `STAFF_ACCESS_CODE` for the project manager / estate office side,
-`CHECKER_ACCESS_CODE` for residents and RWA committee members. Everyone
-types their own name at sign-in, and checkers additionally pick who they're
-acting as (Resident / RWA Committee Member / Estate Office Staff), which is
-what shows up in the activity trail on every action.
+`CHECKER_ACCESS_CODE` for residents and RWA committee members, and
+`ADMIN_ACCESS_CODE` for administrators. Everyone types their own name at
+sign-in, and checkers additionally pick who they're acting as (Resident /
+RWA Committee Member / Estate Office Staff), which is what shows up in the
+activity trail on every action.
+
+**Admin** can do everything staff and checkers can (create tasks, send for
+inspection, approve, return), plus two things they can't: bypass the normal
+workflow order (e.g. approve a task straight from "Assigned to Contractor"
+without it ever going through inspection), and directly edit any field or
+force a task's status via a dedicated "Admin — edit or override" panel on
+every task's detail view — including tasks that are already Approved. Every
+admin action is still logged in the task's activity trail. Treat
+`ADMIN_ACCESS_CODE` as the most sensitive of the three codes.
 
 ## Deploying / updating on Vercel
 

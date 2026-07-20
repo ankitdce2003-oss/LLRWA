@@ -153,6 +153,21 @@ const WORK_LOCATIONS = [
   'Balcony Front', 'Balcony Back', 'Refuge Area', 'External Wall', 'Flat Grill',
   'Tower Lobby', 'Staircases', 'Basement 1', 'Basement 2', 'Others',
 ];
+// Which fields are mandatory depends on the work location: flat-specific
+// work needs both Tower and Flat Number, tower-wide common areas need only
+// Tower, and whole-complex common areas need neither.
+const WORK_LOCATION_RULES = {
+  'Balcony Front': { tower: true, flat: true },
+  'Balcony Back': { tower: true, flat: true },
+  'Flat Grill': { tower: true, flat: true },
+  'External Wall': { tower: true, flat: false },
+  'Tower Lobby': { tower: true, flat: false },
+  'Staircases': { tower: true, flat: false },
+  'Refuge Area': { tower: true, flat: false },
+  'Basement 1': { tower: false, flat: false },
+  'Basement 2': { tower: false, flat: false },
+  'Others': { tower: false, flat: false },
+};
 const MAX_PHOTOS_PER_ACTION = 6;
 const MAX_PHOTO_CHARS = 2_000_000; // ~1.5MB raw per photo after base64 overhead
 
@@ -183,7 +198,7 @@ function makeAudit(action, user, remark, photos) {
 // ---------- task routes ----------
 app.get('/api/tasks', requireAuth, async (req, res) => {
   const tasks = await db.getTasks();
-  res.json({ tasks, workLocations: WORK_LOCATIONS });
+  res.json({ tasks, workLocations: WORK_LOCATIONS, workLocationRules: WORK_LOCATION_RULES });
 });
 
 app.post('/api/tasks', requireAnyRole('staff', 'admin'), async (req, res) => {
@@ -194,18 +209,35 @@ app.post('/api/tasks', requireAnyRole('staff', 'admin'), async (req, res) => {
   if (!WORK_LOCATIONS.includes(workLocation)) {
     return res.status(400).json({ error: 'Invalid work location.' });
   }
+  const rule = WORK_LOCATION_RULES[workLocation] || { tower: false, flat: false };
   const otherText = (workLocationOther || '').trim();
-  if (workLocation === 'Others' && !otherText) {
-    return res.status(400).json({ error: 'Please specify the work location.' });
+  // Flat Number already pins down exactly where flat-specific work is —
+  // everything else (tower-only or complex-wide categories, and "Others")
+  // needs the free-text description instead, so it isn't left vague.
+  const needsDescription = !rule.flat;
+  if (needsDescription && !otherText) {
+    return res.status(400).json({
+      error: workLocation === 'Others'
+        ? 'Please specify the work location.'
+        : `Please add a location description for "${workLocation}" (e.g. which staircase, which floor, which side).`,
+    });
+  }
+  const trimmedTower = (tower || '').trim();
+  const trimmedFlat = (flatNumber || '').trim();
+  if (rule.tower && !trimmedTower) {
+    return res.status(400).json({ error: `Tower is required for "${workLocation}".` });
+  }
+  if (rule.flat && !trimmedFlat) {
+    return res.status(400).json({ error: `Flat Number is required for "${workLocation}".` });
   }
   const validPhotos = validatePhotos(photos);
   if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
 
   const payload = {
     workLocation,
-    workLocationOther: workLocation === 'Others' ? otherText : '',
-    tower: (tower || '').trim(),
-    flatNumber: (flatNumber || '').trim(),
+    workLocationOther: needsDescription ? otherText : '',
+    tower: trimmedTower,
+    flatNumber: trimmedFlat,
     contractorName: (contractorName || '').trim(),
     description: String(description).trim(),
   };
