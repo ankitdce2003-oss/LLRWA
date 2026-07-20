@@ -94,6 +94,13 @@ module.exports = {
     return rows.map(rowToTask);
   },
 
+  // Admin-only: permanently removes a task. Returns the deleted task's id,
+  // or null if no task with that id existed.
+  async deleteTask(id) {
+    const { rows } = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING id', [id]);
+    return rows[0] ? rows[0].id : null;
+  },
+
   // Returns an existing non-Approved task that matches the same work
   // location, tower, flat number, and scope of work — used to block
   // logging an exact duplicate while one is already active.

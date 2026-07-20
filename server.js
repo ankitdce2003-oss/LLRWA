@@ -345,6 +345,14 @@ app.patch('/api/tasks/:id', requireRole('admin'), async (req, res) => {
   res.json({ task: result.task });
 });
 
+// Admin-only: permanently deletes a task. There's no undo — the frontend
+// confirms with the person before calling this.
+app.delete('/api/tasks/:id', requireRole('admin'), async (req, res) => {
+  const deletedId = await db.deleteTask(req.params.id);
+  if (!deletedId) return res.status(404).json({ error: 'Task not found.' });
+  res.json({ ok: true, id: deletedId });
+});
+
 // ---------- static frontend ----------
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
