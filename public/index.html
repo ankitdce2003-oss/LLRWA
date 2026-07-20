@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>La Lagune RWA — Painting Project Tracker</title>
+<style>
+  :root{
+    --ink:#182226; --paper:#F6F3EC; --paper-raised:#FFFFFF; --line:#DAD3C2;
+    --teal:#DCC79E; --teal-deep:#C7A96E; --gold:#B4842B; --brick:#9C3B2E; --sage:#3C6E47; --slate:#5B6670;
+    --font-display:'Space Grotesk','Segoe UI',sans-serif; --font-body:'Inter','Segoe UI',sans-serif; --font-mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);overflow-x:hidden;}
+  ::selection{background:var(--gold);color:#fff;}
+
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,var(--teal-deep),var(--teal));padding:20px;}
+  .login-card{background:var(--paper-raised);border-radius:10px;padding:32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+  .login-card .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--slate);margin-bottom:6px;}
+  .login-card h1{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .login-card .sub{font-size:12.5px;color:var(--slate);margin-bottom:22px;line-height:1.5;}
+  .login-card .field-group{margin-top:16px;}
+  .login-card .field-group:first-child{margin-top:0;}
+  .login-card label{display:block;font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:5px;}
+  .login-card input,.login-card select{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px 11px;font-size:14px;font-family:var(--font-body);}
+  .login-card input:focus,.login-card select:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .login-card .err{background:#F4DEDA;color:var(--brick);border:1px solid #E3B7AE;border-radius:6px;padding:8px 10px;font-size:12.5px;margin-bottom:14px;}
+
+  .plate{background:linear-gradient(180deg,var(--teal-deep),var(--teal));color:var(--ink);padding:22px 28px 20px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;}
+  .plate-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);margin-bottom:4px;}
+  .plate-title h1{margin:0;font-size:24px;font-family:var(--font-display);font-weight:600;letter-spacing:0.02em;}
+  .plate-sub{font-size:12.5px;color:var(--slate);margin-top:4px;max-width:560px;}
+  .identity-box{background:rgba(255,255,255,0.4);border:1px solid rgba(24,34,38,0.14);border-radius:8px;padding:10px 14px;min-width:230px;text-align:right;}
+  .identity-box .who{font-size:13px;font-weight:600;}
+  .identity-box .role-tag{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-top:2px;}
+  .identity-box button{margin-top:8px;background:transparent;border:1px solid rgba(24,34,38,0.3);color:var(--ink);padding:5px 11px;border-radius:5px;font-size:11.5px;cursor:pointer;}
+  .identity-box button:hover{background:rgba(24,34,38,0.08);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 28px 60px;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+  @media(max-width:900px){.summary-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 12px 10px;position:relative;overflow:hidden;}
+  .stat::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--bar,var(--slate));}
+  .stat .n{font-family:var(--font-display);font-size:24px;font-weight:600;}
+  .stat .l{font-size:10.5px;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+
+  .panel{background:var(--paper-raised);border:1px solid var(--line);border-radius:10px;margin-bottom:22px;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;display:flex;align-items:center;gap:8px;}
+  .panel-head h2 .idx{font-family:var(--font-mono);font-size:11px;background:var(--teal);color:var(--ink);padding:2px 7px;border-radius:4px;}
+  .panel-body{padding:18px;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:900px){.form-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.form-grid{grid-template-columns:1fr;}}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field.span-2{grid-column:span 2;}
+  .field.span-4{grid-column:span 4;}
+  @media(max-width:900px){.field.span-4{grid-column:span 2;}}
+  @media(max-width:560px){.field.span-2,.field.span-4{grid-column:span 1;}}
+  .field label{font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.04em;}
+  .field label .req{color:var(--brick);}
+  .field label .opt{color:var(--slate);font-weight:400;text-transform:none;letter-spacing:0;font-size:10.5px;}
+  .field input,.field select,.field textarea{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13.5px;font-family:var(--font-body);background:#FCFBF8;color:var(--ink);}
+  .field textarea{resize:vertical;min-height:64px;}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+
+  .btn{font-family:var(--font-body);font-weight:600;font-size:13px;border-radius:6px;padding:9px 16px;border:1px solid transparent;cursor:pointer;transition:transform .05s ease;min-height:40px;touch-action:manipulation;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--teal);color:var(--ink);}
+  .btn-primary:hover{background:var(--teal-deep);}
+  .btn-approve{background:var(--sage);color:#fff;}
+  .btn-return{background:var(--brick);color:#fff;}
+  .btn-small{padding:6px 11px;font-size:12px;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .filter-row select,.filter-row input{border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;background:#FCFBF8;}
+
+  .register{width:100%;border-collapse:collapse;font-size:13px;}
+  .register thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--slate);border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap;cursor:pointer;user-select:none;}
+  .register thead th:hover{color:var(--ink);background:#F1ECDE;}
+  .register thead th .arrow{display:inline-block;margin-left:3px;font-size:9px;opacity:0.6;}
+  .register thead th.sorted{color:var(--ink);}
+  .register thead th.sorted .arrow{opacity:1;color:var(--gold);}
+  .register tbody tr{border-bottom:1px solid var(--line);cursor:pointer;}
+  .register tbody tr:hover{background:#F1ECDE;}
+  .register td{padding:9px 10px;vertical-align:top;}
+  .id-cell{font-family:var(--font-mono);font-size:12px;color:var(--slate);}
+  .desc-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid transparent;white-space:nowrap;}
+  .tag-assigned{background:#DCE7EE;color:#2B5B7A;border-color:#B7D0DE;}
+  .tag-inspection{background:#FBF0D9;color:#8A6314;border-color:#E9CE8F;}
+  .tag-approved{background:#DDEAE2;color:var(--sage);border-color:#B7D4C2;}
+  .tag-rework{background:#F4DEDA;color:var(--brick);border-color:#E3B7AE;}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--slate);}
+  .empty .big{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-bottom:4px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,26,24,0.45);display:flex;justify-content:flex-end;z-index:50;}
+  .drawer{width:min(600px,100%);background:var(--paper);height:100%;overflow-y:auto;border-left:4px solid var(--gold);}
+  .drawer-head{background:var(--teal-deep);color:var(--ink);padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  .drawer-head .idm{font-family:var(--font-mono);font-size:11px;color:var(--slate);}
+  .drawer-head h3{margin:2px 0 0;font-family:var(--font-display);font-size:18px;}
+  .drawer-close{background:none;border:none;color:var(--ink);font-size:20px;cursor:pointer;line-height:1;}
+  .drawer-body{padding:18px 20px;}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:13px;margin-bottom:14px;}
+  .kv .k{color:var(--slate);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;padding-top:1px;}
+  .desc-block{background:var(--paper-raised);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;margin-bottom:16px;white-space:pre-wrap;}
+
+  .stamp-panel{border:1px dashed var(--line);border-radius:8px;padding:14px;margin-bottom:16px;background:#FCFBF8;}
+  .stamp-panel h4{margin:0 0 8px;font-family:var(--font-display);font-size:13px;}
+  .stamp-panel .hint{font-size:12px;color:var(--slate);margin-bottom:10px;}
+  .remark-input{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;min-height:56px;margin-bottom:10px;font-family:var(--font-body);}
+
+  .trail{list-style:none;margin:0;padding:0;border-left:2px solid var(--line);margin-left:6px;}
+  .trail li{position:relative;padding:0 0 18px 18px;}
+  .trail li::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--dot,var(--slate));border:2px solid var(--paper);}
+  .trail .t-head{font-size:12.5px;font-weight:700;}
+  .trail .t-meta{font-size:11px;color:var(--slate);margin:1px 0 3px;}
+  .trail .t-remark{font-size:12.5px;background:var(--paper-raised);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:6px;}
+
+  .photo-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .photo-strip img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;}
+
+  .photo-picker{margin-bottom:10px;}
+  .photo-picker .drop{border:1.5px dashed var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--slate);cursor:pointer;text-align:center;background:#FCFBF8;text-transform:none;font-weight:400;letter-spacing:normal;line-height:1.4;}
+  .photo-picker .drop:hover{border-color:var(--gold);color:var(--ink);}
+  .photo-picker .preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .photo-picker .thumb{position:relative;width:64px;height:64px;}
+  .photo-picker .thumb img{width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .photo-picker .thumb .rm{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--brick);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;}
+  .photo-picker input[type=file]{display:none;}
+
+  .loading-note{padding:40px;text-align:center;color:var(--slate);font-size:13px;}
+  .banner{background:#FBF0D9;border:1px solid #E9CE8F;color:#7A5A10;border-radius:8px;padding:9px 13px;font-size:12.5px;margin-bottom:16px;}
+  .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,0.3);max-width:90vw;text-align:center;}
+  .field-error{border-color:var(--brick) !important;outline:2px solid var(--brick) !important;outline-offset:1px;}
+  .lightbox{position:fixed;inset:0;background:rgba(10,14,13,0.9);display:flex;align-items:center;justify-content:center;z-index:150;cursor:zoom-out;padding:20px;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  const app = document.getElementById('app');
+  let session = null;
+  let tasks = [];
+  let workLocations = [];
+  let filters = { status:'all', workLocation:'all', search:'' };
+  let sort = { key:'createdAt', dir:'desc' };
+  let activeDetailId = null;
+
+  const MAX_PHOTOS = 6;
+
+  async function api(path, opts){
+    const res = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
+    let data = {};
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  }
+
+  function toast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 4200);
+  }
+
+  // Scrolls a required field into view and highlights it in red, then
+  // clears the highlight as soon as the person interacts with it. This
+  // backs up the toast notification — on some mobile browsers a
+  // bottom-anchored toast can end up hidden below the visible viewport
+  // when the address bar is showing, so validation errors need a second,
+  // impossible-to-miss signal.
+  function flagField(el){
+    if(!el) return;
+    el.classList.add('field-error');
+    el.scrollIntoView({ behavior:'smooth', block:'center' });
+    el.focus({ preventScroll:true });
+    const clear = ()=>{ el.classList.remove('field-error'); el.removeEventListener('input', clear); el.removeEventListener('change', clear); };
+    el.addEventListener('input', clear);
+    el.addEventListener('change', clear);
+  }
+
+  // On some mobile browsers (notably Android Chrome), tapping a button while
+  // an on-screen keyboard is open only dismisses the keyboard — the page
+  // reflows as the keyboard closes, and the browser cancels the synthesized
+  // "click" because the touch start/end coordinates no longer line up with
+  // a stable target. The person then has to tap a second time, which looks
+  // exactly like "the button isn't working." Handling the tap directly on
+  // touchend (with preventDefault to stop the browser's own conflicted
+  // click synthesis) sidesteps that entirely, so the very first tap works
+  // whether or not a keyboard was open. Falls back to a normal click
+  // listener for desktop/mouse use, guarded so it can't double-fire.
+  function bindTap(el, handler){
+    if(!el) return;
+    let handled = false;
+    const run = (e)=>{
+      if(handled) return;
+      handled = true;
+      setTimeout(()=>{ handled = false; }, 500);
+      handler(e);
+    };
+    el.addEventListener('touchend', (e)=>{ e.preventDefault(); run(e); }, { passive:false });
+    el.addEventListener('click', run);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }
+  function statusTagClass(s){
+    return { 'Assigned to Contractor':'tag-assigned','Submitted for Inspection':'tag-inspection','Approved':'tag-approved','Rework Needed':'tag-rework' }[s] || 'tag-assigned';
+  }
+  function dotColor(action){
+    if(/created/i.test(action)) return '#2B5B7A';
+    if(/sent for inspection/i.test(action)) return '#B4842B';
+    if(/approved/i.test(action)) return '#3C6E47';
+    if(/returned/i.test(action)) return '#9C3B2E';
+    return '#5B6670';
+  }
+  function workLocationLabel(t){
+    return t.workLocation === 'Others' && t.workLocationOther ? t.workLocationOther : t.workLocation;
+  }
+
+  // ---------------- Photo compression + picker ----------------
+  function compressImage(file, maxDim, quality){
+    maxDim = maxDim || 1200; quality = quality || 0.7;
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let { width, height } = img;
+          if(width > maxDim || height > maxDim){
+            if(width > height){ height = Math.round(height * maxDim/width); width = maxDim; }
+            else { width = Math.round(width * maxDim/height); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = ()=>reject(new Error('Could not read that image.'));
+        img.src = e.target.result;
+      };
+      reader.onerror = ()=>reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openLightbox(src){
+    const box = document.createElement('div');
+    box.className = 'lightbox';
+    box.innerHTML = `<img src="${src}" />`;
+    box.addEventListener('click', ()=>box.remove());
+    document.body.appendChild(box);
+  }
+
+  function photoStripHTML(photos){
+    if(!photos || !photos.length) return '';
+    return `<div class="photo-strip">${photos.map(p=>`<img src="${p}" data-full="${p}" />`).join('')}</div>`;
+  }
+
+  function renderPhotoPicker(container, photosRef, opts){
+    opts = opts || {};
+    const inputId = 'file-' + Math.random().toString(36).slice(2);
+    container.innerHTML = `
+      <div class="photo-picker">
+        <label class="drop" for="${inputId}">📷 ${opts.label || 'Add photos'} (optional, up to ${MAX_PHOTOS})</label>
+        <input type="file" id="${inputId}" accept="image/*" capture="environment" multiple />
+        <div class="preview" id="${inputId}-preview"></div>
+      </div>
+    `;
+    const input = container.querySelector('#' + inputId);
+    const preview = container.querySelector('#' + inputId + '-preview');
+
+    function renderPreview(){
+      preview.innerHTML = photosRef.list.map((p, i)=>`
+        <div class="thumb">
+          <img src="${p}" data-idx="${i}" />
+          <button type="button" class="rm" data-idx="${i}">×</button>
+        </div>
+      `).join('');
+      preview.querySelectorAll('.rm').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          photosRef.list.splice(Number(btn.getAttribute('data-idx')), 1);
+          renderPreview();
+        });
+      });
+      preview.querySelectorAll('img').forEach(img=>{
+        img.addEventListener('click', ()=>openLightbox(img.src));
+      });
+    }
+    renderPreview();
+
+    input.addEventListener('change', async ()=>{
+      const files = Array.from(input.files || []);
+      if(!files.length) return;
+      const room = MAX_PHOTOS - photosRef.list.length;
+      if(room <= 0){ toast(`You can attach up to ${MAX_PHOTOS} photos.`); input.value=''; return; }
+      const toProcess = files.slice(0, room);
+      if(files.length > room) toast(`Only added ${room} more — ${MAX_PHOTOS} photo limit reached.`);
+      try{
+        const compressed = await Promise.all(toProcess.map(f=>compressImage(f)));
+        photosRef.list.push(...compressed);
+        renderPreview();
+      }catch(err){
+        toast(err.message);
+      }
+      input.value = '';
+    });
+  }
+
+  // ---------------- LOGIN ----------------
+  const CHECKER_TYPES = ['Resident', 'RWA Committee Member', 'Estate Office Staff'];
+
+  function renderLogin(errorMsg){
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="eyebrow">La Lagune RWA · Painting Project</div>
+          <h1>Painting Project Tracker</h1>
+          <div class="sub">This tool helps the Project Manager (PM) from the RWA create tasks for the painting contractor. Once a task is completed by the contractor, the PM will request a resident or a RWA member to inspect and approve it.</div>
+          ${errorMsg ? `<div class="err">${escapeHtml(errorMsg)}</div>` : ''}
+          <form id="loginForm">
+            <div class="field-group">
+              <label for="role">I am</label>
+              <select id="role">
+                <option value="staff">Project Manager / Estate Office</option>
+                <option value="checker">Resident / RWA Inspector</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div class="field-group" id="checkerTypeField" style="display:none;">
+              <label for="checkerType">Acting as</label>
+              <select id="checkerType">
+                ${CHECKER_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label for="name">Your name</label>
+              <input id="name" type="text" placeholder="e.g. Ramesh, or Mrs. Sharma (B-402)" autocomplete="name" required />
+            </div>
+
+            <div class="field-group">
+              <label for="code">Access code</label>
+              <input id="code" type="password" placeholder="Shared code for this role" autocomplete="current-password" required />
+            </div>
+
+            <button class="btn btn-primary" style="width:100%;margin-top:18px;" type="submit">Sign in</button>
+          </form>
+        </div>
+      </div>
+    `;
+    const roleSelect = document.getElementById('role');
+    const checkerTypeField = document.getElementById('checkerTypeField');
+    function syncCheckerField(){ checkerTypeField.style.display = roleSelect.value === 'checker' ? 'block' : 'none'; }
+    roleSelect.addEventListener('change', syncCheckerField);
+    syncCheckerField();
+
+    document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const role = roleSelect.value;
+      const name = document.getElementById('name').value.trim();
+      const code = document.getElementById('code').value;
+      const checkerType = role === 'checker' ? document.getElementById('checkerType').value : undefined;
+      try{
+        const data = await api('/api/login', { method:'POST', body: JSON.stringify({ role, name, code, checkerType }) });
+        session = data.user;
+        await boot();
+      }catch(err){
+        renderLogin(err.message);
+      }
+    });
+  }
+
+  // ---------------- APP SHELL ----------------
+  async function loadTasks(){
+    const data = await api('/api/tasks');
+    tasks = data.tasks;
+    workLocations = data.workLocations;
+  }
+
+  function filteredSortedTasks(){
+    let list = tasks.filter(t=>{
+      if(filters.status !== 'all' && t.status !== filters.status) return false;
+      if(filters.workLocation !== 'all' && t.workLocation !== filters.workLocation) return false;
+      if(filters.search){
+        const s = filters.search.toLowerCase();
+        const hay = [t.id, t.tower, t.flatNumber, workLocationLabel(t), t.description, t.contractorName].join(' ').toLowerCase();
+        if(!hay.includes(s)) return false;
+      }
+      return true;
+    });
+    const key = sort.key;
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    list = list.slice().sort((a,b)=>{
+      let av, bv;
+      if(key === 'createdAt'){ av = new Date(a.createdAt).getTime(); bv = new Date(b.createdAt).getTime(); }
+      else if(key === 'workLocation'){ av = workLocationLabel(a); bv = workLocationLabel(b); }
+      else { av = a[key]; bv = b[key]; }
+      if(typeof av === 'string') av = av.toLowerCase();
+      if(typeof bv === 'string') bv = bv.toLowerCase();
+      if(av == null) av = '';
+      if(bv == null) bv = '';
+      if(av < bv) return -1 * dir;
+      if(av > bv) return 1 * dir;
+      return 0;
+    });
+    return list;
+  }
+
+  function summaryCounts(){
+    const s = {total:tasks.length, assigned:0, inspection:0, approved:0, rework:0};
+    tasks.forEach(t=>{
+      if(t.status==='Assigned to Contractor') s.assigned++;
+      if(t.status==='Submitted for Inspection') s.inspection++;
+      if(t.status==='Approved') s.approved++;
+      if(t.status==='Rework Needed') s.rework++;
+    });
+    return s;
+  }
+
+  const COLUMNS = [
+    { key:'id', label:'ID' },
+    { key:'createdAt', label:'Created' },
+    { key:'workLocation', label:'Work Location' },
+    { key:'tower', label:'Tower' },
+    { key:'flatNumber', label:'Flat No.' },
+    { key:'contractorName', label:'Contractor' },
+    { key:'status', label:'Status' },
+    { key:'checker', label:'Inspector' },
+  ];
+
+  function renderApp(){
+    const s = summaryCounts();
+    const list = filteredSortedTasks();
+    const isStaff = session.role === 'staff';
+    const isAdmin = session.role === 'admin';
+    const isChecker = session.role === 'checker';
+    const canCreate = isStaff || isAdmin;
+
+    app.innerHTML = `
+      <div class="plate">
+        <div>
+          <div class="plate-eyebrow">La Lagune RWA &middot; Painting Project</div>
+          <div class="plate-title"><h1>Painting Project Tracker</h1></div>
+          <div class="plate-sub">This tool helps the Project Manager (PM) from the RWA create tasks for the painting contractor. Once a task is completed by the contractor, the PM will request a resident or a RWA member to inspect and approve it.</div>
+        </div>
+        <div class="identity-box">
+          <div class="who">${escapeHtml(session.displayName)}</div>
+          <div class="role-tag">${isAdmin ? 'Admin · Full access' : isStaff ? 'Project Manager' : escapeHtml(session.checkerType || 'Checker') + ' · Inspector'}</div>
+          <button type="button" id="logoutBtn">Sign out</button>
+        </div>
+      </div>
+      <div class="wrap" id="wrap"></div>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+      await api('/api/logout', { method:'POST' });
+      session = null; tasks = []; activeDetailId = null;
+      renderLogin();
+    });
+
+    const wrap = document.getElementById('wrap');
+    wrap.innerHTML = `
+      <div class="summary-grid">
+        <div class="stat" style="--bar:#2B5B7A"><div class="n">${s.assigned}</div><div class="l">Assigned to Contractor</div></div>
+        <div class="stat" style="--bar:#B4842B"><div class="n">${s.inspection}</div><div class="l">Awaiting Inspection</div></div>
+        <div class="stat" style="--bar:#3C6E47"><div class="n">${s.approved}</div><div class="l">Approved</div></div>
+        <div class="stat" style="--bar:#9C3B2E"><div class="n">${s.rework}</div><div class="l">Rework Needed</div></div>
+      </div>
+
+      ${canCreate ? `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">${isAdmin ? 'Admin' : 'PM'}</span> Create a new painting task</h2></div>
+        <div class="panel-body">
+          <div class="banner">Logging a task here only creates it — it stays with the contractor until you explicitly send it for inspection from the task's detail view.</div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="f-location">Work Location <span class="req">*</span></label>
+              <select id="f-location">${workLocations.map(w=>`<option>${w}</option>`).join('')}</select>
+            </div>
+            <div class="field" id="otherLocationField" style="display:none;">
+              <label for="f-location-other">Please specify <span class="req">*</span></label>
+              <input id="f-location-other" type="text" placeholder="Describe the work location" />
+            </div>
+            <div class="field"><label for="f-tower">Tower <span class="opt">(optional)</span></label><input id="f-tower" type="text" placeholder="e.g. B" /></div>
+            <div class="field"><label for="f-flat">Flat Number <span class="opt">(if applicable)</span></label><input id="f-flat" type="text" placeholder="e.g. 402" /></div>
+            <div class="field"><label for="f-contractor">Contractor / team <span class="opt">(optional)</span></label><input id="f-contractor" type="text" placeholder="e.g. Shree Painters" /></div>
+            <div class="field span-4"><label for="f-desc">Scope of work <span class="req">*</span></label><textarea id="f-desc" placeholder="e.g. Scrape old paint, 2 coats primer, 2 coats exterior emulsion, repair visible cracks…"></textarea></div>
+            <div class="field span-4" id="newTaskPhotoContainer"></div>
+          </div>
+          <div class="form-actions"><button type="button" class="btn btn-primary" id="submitBtn">Create task</button></div>
+        </div>
+      </div>` : `
+      <div class="panel">
+        <div class="panel-head"><h2><span class="idx">Inspector</span> Your review queue</h2></div>
+        <div class="panel-body"><div class="banner">Tasks appear here once the PM sends completed work for inspection. Review it, then approve or send back for rework with a note.</div></div>
+      </div>`}
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Task register</h2>
+          <div class="filter-row">
+            <input id="searchInput" type="text" placeholder="Search location, ID, contractor…" value="${escapeHtml(filters.search)}" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option>Assigned to Contractor</option><option>Submitted for Inspection</option><option>Approved</option><option>Rework Needed</option>
+            </select>
+            <select id="locationFilter"><option value="all">All work locations</option>${workLocations.map(w=>`<option>${w}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          ${list.length ? `
+          <div style="overflow-x:auto;">
+          <table class="register">
+            <thead><tr>
+              ${COLUMNS.map(c=>`<th data-key="${c.key}" class="${sort.key===c.key?'sorted':''}">${c.label}<span class="arrow">${sort.key===c.key ? (sort.dir==='asc'?'▲':'▼') : '↕'}</span></th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${list.map(t=>`
+                <tr data-id="${t.id}">
+                  <td class="id-cell">${t.id}</td>
+                  <td>${fmtDate(t.createdAt)}</td>
+                  <td class="desc-cell">${escapeHtml(workLocationLabel(t))}</td>
+                  <td>${escapeHtml(t.tower) || '—'}</td>
+                  <td>${escapeHtml(t.flatNumber) || '—'}</td>
+                  <td>${escapeHtml(t.contractorName) || '—'}</td>
+                  <td><span class="tag ${statusTagClass(t.status)}">${t.status}</span></td>
+                  <td>${escapeHtml(t.checker) || '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          </div>` : `<div class="empty"><div class="big">No tasks match these filters</div>Adjust filters above, or create a new task.</div>`}
+        </div>
+      </div>
+    `;
+
+    if(canCreate){
+      const newTaskPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('newTaskPhotoContainer'), newTaskPhotos, { label: 'Current condition photos' });
+
+      const locationSelect = document.getElementById('f-location');
+      const otherField = document.getElementById('otherLocationField');
+      function syncOtherField(){ otherField.style.display = locationSelect.value === 'Others' ? 'flex' : 'none'; }
+      locationSelect.addEventListener('change', syncOtherField);
+      syncOtherField();
+
+      bindTap(document.getElementById('submitBtn'), async ()=>{
+        const workLocation = locationSelect.value;
+        const workLocationOther = document.getElementById('f-location-other').value.trim();
+        const tower = document.getElementById('f-tower').value.trim();
+        const flatNumber = document.getElementById('f-flat').value.trim();
+        const contractorName = document.getElementById('f-contractor').value.trim();
+        const descField = document.getElementById('f-desc');
+        const description = descField.value.trim();
+        if(!description){ toast('Please fill in the scope of work.'); flagField(descField); return; }
+        if(workLocation === 'Others' && !workLocationOther){
+          toast('Please specify the work location.');
+          flagField(document.getElementById('f-location-other'));
+          return;
+        }
+        try{
+          await api('/api/tasks', { method:'POST', body: JSON.stringify({ workLocation, workLocationOther, tower, flatNumber, contractorName, description, photos: newTaskPhotos.list })});
+          toast('Task created.');
+          await refresh();
+        }catch(err){ toast(err.message); }
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e)=>{ filters.search = e.target.value; renderApp(); });
+    document.getElementById('statusFilter').value = filters.status;
+    document.getElementById('statusFilter').addEventListener('change', (e)=>{ filters.status = e.target.value; renderApp(); });
+    document.getElementById('locationFilter').value = filters.workLocation;
+    document.getElementById('locationFilter').addEventListener('change', (e)=>{ filters.workLocation = e.target.value; renderApp(); });
+
+    wrap.querySelectorAll('thead th').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const key = th.getAttribute('data-key');
+        if(sort.key === key){ sort.dir = sort.dir === 'asc' ? 'desc' : 'asc'; }
+        else { sort.key = key; sort.dir = 'asc'; }
+        renderApp();
+      });
+    });
+
+    wrap.querySelectorAll('tbody tr').forEach(tr=>{
+      tr.addEventListener('click', ()=> openDetail(tr.getAttribute('data-id')));
+    });
+
+    if(activeDetailId) renderDetail(activeDetailId);
+  }
+
+  async function refresh(){
+    await loadTasks();
+    renderApp();
+  }
+
+  function openDetail(id){ activeDetailId = id; renderDetail(id); }
+  function closeDetail(){ activeDetailId = null; const ov = document.getElementById('detailOverlay'); if(ov) ov.remove(); }
+
+  function renderDetail(id){
+    const existing = document.getElementById('detailOverlay');
+    if(existing) existing.remove();
+    const t = tasks.find(x=>x.id===id);
+    if(!t) return;
+    const isStaff = session.role === 'staff';
+    const isChecker = session.role === 'checker';
+    const isAdmin = session.role === 'admin';
+    const ALL_STATUSES = ['Assigned to Contractor', 'Submitted for Inspection', 'Approved', 'Rework Needed'];
+
+    let actionPanel = '';
+    if(isStaff && (t.status==='Assigned to Contractor' || t.status==='Rework Needed')){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Send for inspection</h4>
+          <div class="hint">Once the contractor finishes this, send it to a resident/RWA inspector for review. Photos aren't required, but help the inspector see the work without visiting in person.</div>
+          <textarea class="remark-input" id="markReadyRemark" placeholder="Any notes for the inspector (optional)…"></textarea>
+          <div id="markReadyPhotoContainer"></div>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button type="button" class="btn btn-primary btn-small" id="markReadyBtn">Send for inspection</button>
+          </div>
+        </div>`;
+    } else if(isChecker && t.status==='Submitted for Inspection'){
+      actionPanel = `
+        <div class="stamp-panel">
+          <h4>Inspect this task</h4>
+          <div class="hint">Review the photos above (and the site, if you can), then approve or send it back for rework with a note.</div>
+          <textarea class="remark-input" id="reviewRemark" placeholder="Remarks (optional for approval, required if sending back)…"></textarea>
+          <div id="reviewPhotoContainer"></div>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button type="button" class="btn btn-approve btn-small" id="approveBtn">Approve</button>
+            <button type="button" class="btn btn-return btn-small" id="returnBtn">Send back — rework needed</button>
+          </div>
+        </div>`;
+    }
+
+    let adminPanel = '';
+    if(isAdmin){
+      adminPanel = `
+        <div class="stamp-panel">
+          <h4>Admin — edit or override</h4>
+          <div class="hint">Change any field or force the status directly, regardless of the normal workflow order. Use this for corrections (e.g. fixing a mistaken approval or a typo).</div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="adminLocation">Work Location</label>
+              <select id="adminLocation">${workLocations.map(w=>`<option ${w===t.workLocation?'selected':''}>${w}</option>`).join('')}</select>
+            </div>
+            <div class="field" id="adminOtherField" style="${t.workLocation==='Others' ? '' : 'display:none;'}">
+              <label for="adminLocationOther">Specify</label>
+              <input id="adminLocationOther" type="text" value="${escapeHtml(t.workLocationOther)}" />
+            </div>
+            <div class="field"><label for="adminTower">Tower</label><input id="adminTower" type="text" value="${escapeHtml(t.tower)}" /></div>
+            <div class="field"><label for="adminFlat">Flat No.</label><input id="adminFlat" type="text" value="${escapeHtml(t.flatNumber)}" /></div>
+            <div class="field"><label for="adminContractor">Contractor</label><input id="adminContractor" type="text" value="${escapeHtml(t.contractorName)}" /></div>
+            <div class="field"><label for="adminStatus">Status</label>
+              <select id="adminStatus">${ALL_STATUSES.map(st=>`<option ${st===t.status?'selected':''}>${st}</option>`).join('')}</select>
+            </div>
+            <div class="field span-4"><label for="adminDesc">Scope of work</label><textarea id="adminDesc">${escapeHtml(t.description)}</textarea></div>
+            <div class="field span-4" id="adminPhotoContainer"></div>
+          </div>
+          <textarea class="remark-input" id="adminRemark" placeholder="Reason for this change (optional, recorded in the activity log)…"></textarea>
+          <div class="form-actions" style="margin-top:0;justify-content:flex-start;">
+            <button type="button" class="btn btn-primary btn-small" id="adminSaveBtn">Save changes</button>
+          </div>
+        </div>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.id = 'detailOverlay';
+    overlay.innerHTML = `
+      <div class="drawer">
+        <div class="drawer-head">
+          <div><div class="idm">${t.id}</div><h3>${escapeHtml(workLocationLabel(t))}</h3></div>
+          <button type="button" class="drawer-close" id="closeDrawer" aria-label="Close">&times;</button>
+        </div>
+        <div class="drawer-body">
+          <div class="kv">
+            <div class="k">Status</div><div><span class="tag ${statusTagClass(t.status)}">${t.status}</span></div>
+            <div class="k">Work Location</div><div>${escapeHtml(workLocationLabel(t))}</div>
+            <div class="k">Tower</div><div>${escapeHtml(t.tower) || '—'}</div>
+            <div class="k">Flat No.</div><div>${escapeHtml(t.flatNumber) || '—'}</div>
+            <div class="k">Contractor</div><div>${escapeHtml(t.contractorName) || '—'}</div>
+            <div class="k">Created by</div><div>${escapeHtml(t.loggedBy)}</div>
+            <div class="k">Created on</div><div>${fmtDate(t.createdAt)}</div>
+            <div class="k">Inspector</div><div>${escapeHtml(t.checker) || 'Not yet reviewed'}</div>
+          </div>
+          <div class="desc-block">${escapeHtml(t.description)}</div>
+          ${actionPanel}
+          ${adminPanel}
+          <h4 style="font-family:var(--font-display);font-size:13px;margin:18px 0 10px;">Activity &amp; photos</h4>
+          <ul class="trail">
+            ${t.audit.slice().reverse().map(a=>`
+              <li style="--dot:${dotColor(a.action)}">
+                <div class="t-head">${escapeHtml(a.action)}</div>
+                <div class="t-meta">${escapeHtml(a.actor)} (${a.role==='staff'?'Project Manager':a.role==='admin'?'Admin':escapeHtml(a.checkerType || 'Inspector')}) · ${fmtDate(a.timestamp)}</div>
+                ${a.remark ? `<div class="t-remark">${escapeHtml(a.remark)}</div>` : ''}
+                ${photoStripHTML(a.photos)}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeDetail(); });
+    document.getElementById('closeDrawer').addEventListener('click', closeDetail);
+    overlay.querySelectorAll('.photo-strip img').forEach(img=>{
+      img.addEventListener('click', ()=>openLightbox(img.getAttribute('data-full')));
+    });
+
+    if(isStaff && (t.status==='Assigned to Contractor' || t.status==='Rework Needed')){
+      const markReadyPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('markReadyPhotoContainer'), markReadyPhotos, { label: 'Completed work photos' });
+      bindTap(document.getElementById('markReadyBtn'), async ()=>{
+        try{
+          await api(`/api/tasks/${t.id}/mark-ready`, { method:'POST', body: JSON.stringify({ remark: document.getElementById('markReadyRemark').value.trim(), photos: markReadyPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+    } else if(isChecker && t.status==='Submitted for Inspection'){
+      const reviewPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('reviewPhotoContainer'), reviewPhotos, { label: 'Your own photos' });
+      bindTap(document.getElementById('approveBtn'), async ()=>{
+        try{
+          await api(`/api/tasks/${t.id}/approve`, { method:'POST', body: JSON.stringify({ remark: document.getElementById('reviewRemark').value.trim(), photos: reviewPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+      bindTap(document.getElementById('returnBtn'), async ()=>{
+        const remarkField = document.getElementById('reviewRemark');
+        const remark = remarkField.value.trim();
+        if(!remark){ toast('Please explain what needs rework.'); flagField(remarkField); return; }
+        try{
+          await api(`/api/tasks/${t.id}/return`, { method:'POST', body: JSON.stringify({ remark, photos: reviewPhotos.list })});
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+    }
+
+    if(isAdmin){
+      const adminPhotos = { list: [] };
+      renderPhotoPicker(document.getElementById('adminPhotoContainer'), adminPhotos, { label: 'Supporting photos' });
+      const adminLocationSelect = document.getElementById('adminLocation');
+      const adminOtherField = document.getElementById('adminOtherField');
+      adminLocationSelect.addEventListener('change', ()=>{
+        adminOtherField.style.display = adminLocationSelect.value === 'Others' ? 'flex' : 'none';
+      });
+      bindTap(document.getElementById('adminSaveBtn'), async ()=>{
+        const workLocation = adminLocationSelect.value;
+        const otherField = document.getElementById('adminLocationOther');
+        const workLocationOther = otherField.value.trim();
+        const descField = document.getElementById('adminDesc');
+        const description = descField.value.trim();
+        if(workLocation === 'Others' && !workLocationOther){ toast('Please specify the work location.'); flagField(otherField); return; }
+        if(!description){ toast('Scope of work cannot be blank.'); flagField(descField); return; }
+        try{
+          await api(`/api/tasks/${t.id}`, { method:'PATCH', body: JSON.stringify({
+            workLocation, workLocationOther,
+            tower: document.getElementById('adminTower').value.trim(),
+            flatNumber: document.getElementById('adminFlat').value.trim(),
+            contractorName: document.getElementById('adminContractor').value.trim(),
+            description,
+            status: document.getElementById('adminStatus').value,
+            remark: document.getElementById('adminRemark').value.trim(),
+            photos: adminPhotos.list,
+          })});
+          toast('Task updated.');
+          await refresh(); openDetail(t.id);
+        }catch(err){ toast(err.message); }
+      });
+    }
+  }
+
+  async function boot(){
+    app.innerHTML = '<div class="loading-note">Loading tasks…</div>';
+    try{
+      if(!session){
+        const s = await api('/api/session');
+        session = s.user;
+      }
+      if(!session){ renderLogin(); return; }
+      await loadTasks();
+      renderApp();
+    }catch(err){
+      renderLogin(err.message);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
