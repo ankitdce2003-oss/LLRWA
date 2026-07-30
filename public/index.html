@@ -179,35 +179,101 @@
     setTimeout(()=>el.remove(), 4200);
   }
 
-  // Exports whatever rows are currently visible in the register (respecting
-  // active filters/search/sort) as a .csv — Excel opens these natively.
-  // Available to every signed-in role (staff, checker, admin).
-  function exportRegisterToExcel(rows){
-    if(!rows.length){ toast('No tasks to export with the current filters.'); return; }
-    const headers = ['ID','Created','Work Location','Tower','Flat No.','Contractor','Status','Inspector','Scope of Work'];
-    const csvField = (val)=>{
-      const s = (val == null ? '' : String(val));
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-    };
-    const lines = [headers.map(csvField).join(',')];
-    rows.forEach(t=>{
-      lines.push([
-        t.id, fmtDate(t.createdAt), workLocationLabel(t), t.tower || '', t.flatNumber || '',
-        t.contractorName || '', t.status, t.checker || '', t.description,
-      ].map(csvField).join(','));
+  // ExcelJS (~925KB) is only needed when someone actually exports, so it's
+  // loaded on demand from the app's own /vendor folder rather than at page
+  // load — keeps normal usage fast while still working with no CDN/CSP
+  // changes needed (it's served from the same origin as everything else).
+  let exceljsLoadPromise = null;
+  function ensureExcelJSLoaded(){
+    if(window.ExcelJS) return Promise.resolve();
+    if(exceljsLoadPromise) return exceljsLoadPromise;
+    exceljsLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'vendor/exceljs.min.js';
+      s.onload = ()=>resolve();
+      s.onerror = ()=>{ exceljsLoadPromise = null; reject(new Error('Could not load the Excel export library. Check your connection and try again.')); };
+      document.body.appendChild(s);
     });
-    // Leading BOM so Excel reliably detects UTF-8 (handles ₹, names with
-    // accents, etc. correctly instead of showing garbled characters).
-    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const stamp = new Date().toISOString().slice(0,10);
-    a.href = url;
-    a.download = `painting-task-register-${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    return exceljsLoadPromise;
+  }
+
+  // Exports whatever rows are currently visible in the register (respecting
+  // active filters/search/sort) as a real .xlsx file, with the task's
+  // "before" (current condition at creation) and "after" (most recent
+  // completed-work submission) photos embedded directly in the sheet.
+  // Available to every signed-in role (staff, checker, admin).
+  async function exportRegisterToExcel(rows){
+    if(!rows.length){ toast('No tasks to export with the current filters.'); return; }
+    toast('Preparing Excel file…');
+    try{
+      await ensureExcelJSLoaded();
+      const workbook = new window.ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Tasks');
+
+      // Every photo from every step of each task's activity trail, in
+      // chronological order — creation, every submission (a task that went
+      // through rework has more than one), approval, all of it. Nothing
+      // gets left out just because it wasn't the very first photo.
+      const photosPerTask = rows.map(t=>{
+        const flat = [];
+        t.audit.forEach(a=>{
+          (a.photos || []).forEach(p=> flat.push({ src:p, label:`${a.action} — ${fmtDate(a.timestamp)}` }));
+        });
+        return flat;
+      });
+      const maxPhotos = Math.max(1, ...photosPerTask.map(p=>p.length));
+
+      const baseColumns = [
+        { header:'ID', key:'id', width:12 },
+        { header:'Created', key:'created', width:18 },
+        { header:'Work Location', key:'location', width:26 },
+        { header:'Tower', key:'tower', width:8 },
+        { header:'Flat No.', key:'flat', width:10 },
+        { header:'Contractor', key:'contractor', width:18 },
+        { header:'Status', key:'status', width:20 },
+        { header:'Inspector', key:'inspector', width:18 },
+        { header:'Scope of Work', key:'scope', width:36 },
+      ];
+      const photoColumns = [];
+      for(let i=1;i<=maxPhotos;i++) photoColumns.push({ header:`Photo ${i}`, key:`photo${i}`, width:16 });
+      sheet.columns = baseColumns.concat(photoColumns);
+      sheet.getRow(1).font = { bold:true };
+
+      rows.forEach((t, idx)=>{
+        const row = sheet.addRow({
+          id:t.id, created:fmtDate(t.createdAt), location:workLocationLabel(t),
+          tower:t.tower || '', flat:t.flatNumber || '', contractor:t.contractorName || '',
+          status:t.status, inspector:t.checker || '', scope:t.description,
+        });
+        row.height = 68;
+        row.alignment = { vertical:'middle', wrapText:true };
+
+        photosPerTask[idx].forEach((photo, pIdx)=>{
+          const colIndex = baseColumns.length + pIdx; // 0-based, for addImage
+          const commaIdx = photo.src.indexOf(',');
+          const base64 = commaIdx >= 0 ? photo.src.slice(commaIdx + 1) : photo.src;
+          const imageId = workbook.addImage({ base64, extension:'jpeg' });
+          sheet.addImage(imageId, { tl:{ col:colIndex, row:row.number - 1 }, ext:{ width:82, height:82 } });
+          // Hovering the (otherwise blank) cell behind each photo shows
+          // which activity-log step it came from and when.
+          sheet.getCell(row.number, colIndex + 1).note = photo.label;
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0,10);
+      a.href = url;
+      a.download = `painting-task-register-${stamp}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }catch(err){
+      toast('Could not generate the Excel file: ' + err.message);
+    }
   }
 
   // Scrolls a required field into view and highlights it in red, then
