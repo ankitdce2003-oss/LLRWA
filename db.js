@@ -94,6 +94,11 @@ module.exports = {
     return rows.map(rowToTask);
   },
 
+  async getTaskById(id) {
+    const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    return rows[0] ? rowToTask(rows[0]) : null;
+  },
+
   // Admin-only: permanently removes a task. Returns the deleted task's id,
   // or null if no task with that id existed.
   async deleteTask(id) {

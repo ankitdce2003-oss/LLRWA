@@ -52,13 +52,24 @@ in its activity trail.
 
 ## How sign-in works
 
-No individual accounts — three shared access codes:
+No individual accounts — four shared access codes:
 `STAFF_ACCESS_CODE` for the project manager / estate office side,
-`CHECKER_ACCESS_CODE` for residents and RWA committee members, and
+`CHECKER_ACCESS_CODE` for residents and RWA committee members,
+`CONTRACTOR_ACCESS_CODE` for the painting contractor, and
 `ADMIN_ACCESS_CODE` for administrators. Everyone types their own name at
 sign-in, and checkers additionally pick who they're acting as (Resident /
 RWA Committee Member / Estate Office Staff), which is what shows up in the
 activity trail on every action.
+
+**Contractor** logins only see tasks assigned to them — matched against the
+task's Contractor field (set by `CONTRACTOR_NAME_FILTER`, defaults to
+"Dayton"). They can view full task details read-only, and once work is
+done, add their own remark and photos, which submits the task for
+inspection — the same transition the PM's "Send for inspection" button
+makes, just performed by the contractor directly. This is enforced
+server-side: a contractor can't act on a task that isn't theirs even if
+they know its ID. Only one contractor's name filter is supported right
+now — a second contractor company would need a small code change.
 
 **Admin** can do everything staff and checkers can (create tasks, send for
 inspection, approve, return), plus two things they can't: bypass the normal
@@ -67,13 +78,14 @@ without it ever going through inspection), and directly edit any field or
 force a task's status via a dedicated "Admin — edit or override" panel on
 every task's detail view — including tasks that are already Approved. Every
 admin action is still logged in the task's activity trail. Treat
-`ADMIN_ACCESS_CODE` as the most sensitive of the three codes.
+`ADMIN_ACCESS_CODE` as the most sensitive of the four codes.
 
 ## Deploying / updating on Vercel
 
 Hosting is unchanged from before — same Vercel project, same Postgres
-database, same three environment variables (`JWT_SECRET`,
-`STAFF_ACCESS_CODE`, `CHECKER_ACCESS_CODE`). To pick up this update:
+database, same core environment variables (`JWT_SECRET`,
+`STAFF_ACCESS_CODE`, `CHECKER_ACCESS_CODE`, plus the new
+`CONTRACTOR_ACCESS_CODE`). To pick up this update:
 
 1. Replace `server.js`, `db.js`, and `public/index.html` in your GitHub
    repository with the versions in this zip (open each file on GitHub,
@@ -93,7 +105,7 @@ database, same three environment variables (`JWT_SECRET`,
 ```bash
 npm install
 cp .env.example .env
-# fill in JWT_SECRET, STAFF_ACCESS_CODE, CHECKER_ACCESS_CODE, and POSTGRES_URL
+# fill in JWT_SECRET, STAFF_ACCESS_CODE, CHECKER_ACCESS_CODE, CONTRACTOR_ACCESS_CODE, and POSTGRES_URL
 npm start
 ```
 Then open http://localhost:3000.

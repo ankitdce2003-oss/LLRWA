@@ -113,11 +113,11 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   if (!role || !code || !name) {
     return res.status(400).json({ error: 'Role, access code, and your name are all required.' });
   }
-  if (!['staff', 'checker', 'admin'].includes(role)) {
+  if (!['staff', 'checker', 'admin', 'contractor'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role.' });
   }
 
-  const CODE_ENV = { staff: 'STAFF_ACCESS_CODE', checker: 'CHECKER_ACCESS_CODE', admin: 'ADMIN_ACCESS_CODE' }[role];
+  const CODE_ENV = { staff: 'STAFF_ACCESS_CODE', checker: 'CHECKER_ACCESS_CODE', admin: 'ADMIN_ACCESS_CODE', contractor: 'CONTRACTOR_ACCESS_CODE' }[role];
   const expected = process.env[CODE_ENV];
   if (!expected) {
     return res.status(503).json({ error: `${CODE_ENV} is not set up yet. Add it in Vercel's Environment Variables.` });
@@ -196,8 +196,19 @@ function makeAudit(action, user, remark, photos) {
 }
 
 // ---------- task routes ----------
+// A contractor login only sees tasks assigned to them — matched by a
+// case-insensitive substring against the task's Contractor field, since
+// that field is free text typed by the PM (e.g. "Dayton Thermosiphon Pvt.
+// Ltd."). Set CONTRACTOR_NAME_FILTER if the contractor's name in your
+// tasks doesn't contain "Dayton" — defaults to that since it's the only
+// contractor login set up right now.
+const CONTRACTOR_NAME_FILTER = (process.env.CONTRACTOR_NAME_FILTER || 'Dayton').toLowerCase();
+
 app.get('/api/tasks', requireAuth, async (req, res) => {
-  const tasks = await db.getTasks();
+  let tasks = await db.getTasks();
+  if (req.user.role === 'contractor') {
+    tasks = tasks.filter((t) => (t.contractorName || '').toLowerCase().includes(CONTRACTOR_NAME_FILTER));
+  }
   res.json({ tasks, workLocations: WORK_LOCATIONS, workLocationRules: WORK_LOCATION_RULES });
 });
 
@@ -259,7 +270,14 @@ app.post('/api/tasks', requireAnyRole('staff', 'admin'), async (req, res) => {
   res.status(201).json({ task });
 });
 
-app.post('/api/tasks/:id/mark-ready', requireAnyRole('staff', 'admin'), async (req, res) => {
+app.post('/api/tasks/:id/mark-ready', requireAnyRole('staff', 'admin', 'contractor'), async (req, res) => {
+  if (req.user.role === 'contractor') {
+    const existing = await db.getTaskById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Task not found.' });
+    if (!(existing.contractorName || '').toLowerCase().includes(CONTRACTOR_NAME_FILTER)) {
+      return res.status(403).json({ error: 'This task is not assigned to you.' });
+    }
+  }
   const validPhotos = validatePhotos(req.body?.photos);
   if (validPhotos === null) return res.status(400).json({ error: `Please attach at most ${MAX_PHOTOS_PER_ACTION} photos.` });
   const gate = req.user.role === 'admin' ? null : ['Assigned to Contractor', 'Rework Needed'];
