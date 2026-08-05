@@ -353,6 +353,50 @@ app.delete('/api/tasks/:id', requireRole('admin'), async (req, res) => {
   res.json({ ok: true, id: deletedId });
 });
 
+// Admin-only: creates many tasks in one request — used for one-off imports
+// of existing records (e.g. converting an older spreadsheet tracker into
+// this tool). Each item is validated independently so one bad row doesn't
+// block the rest; the duplicate-task guard is intentionally skipped here,
+// since importing genuinely distinct historical records is the whole point.
+app.post('/api/tasks/bulk-import', requireRole('admin'), async (req, res) => {
+  const incoming = req.body?.tasks;
+  if (!Array.isArray(incoming) || incoming.length === 0) {
+    return res.status(400).json({ error: 'No tasks provided to import.' });
+  }
+  if (incoming.length > 500) {
+    return res.status(400).json({ error: 'Please import in batches of 500 or fewer.' });
+  }
+
+  let created = 0;
+  const failed = [];
+  for (let i = 0; i < incoming.length; i++) {
+    const item = incoming[i] || {};
+    try {
+      const workLocation = item.workLocation;
+      if (!WORK_LOCATIONS.includes(workLocation)) throw new Error('Invalid work location.');
+      const description = String(item.description || '').trim();
+      if (!description) throw new Error('Missing description.');
+      const validPhotos = validatePhotos(item.photos);
+      if (validPhotos === null) throw new Error('Too many or oversized photos.');
+
+      await db.createTask({
+        workLocation,
+        workLocationOther: (item.workLocationOther || '').trim(),
+        tower: (item.tower || '').trim(),
+        flatNumber: (item.flatNumber || '').trim(),
+        contractorName: (item.contractorName || '').trim(),
+        description,
+        loggedBy: req.user.displayName,
+        auditEntry: makeAudit('Task created', req.user, item.importNote || 'Bulk-imported.', validPhotos),
+      });
+      created++;
+    } catch (err) {
+      failed.push({ index: i, error: err.message });
+    }
+  }
+  res.json({ created, failed });
+});
+
 // ---------- static frontend ----------
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
